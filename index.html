@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Iron Blueprint</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        input[type="number"] { -moz-appearance: textfield; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-black">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Simplified Lucide Icon Component for CDN version
+        const Icon = ({ name, size = 24, className = "" }) => {
+            useEffect(() => { lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const STORAGE_KEY = 'iron_blueprint_react_v2';
+
+        const BARBELL_LOADS = {
+            45: [], 65: [10], 95: [25], 115: [35], 135: [45],
+            155: [45, 10], 165: [35, 25], 185: [45, 25], 205: [45, 35],
+            225: [45, 45], 245: [45, 45, 10], 255: [45, 35, 25],
+            275: [45, 45, 25], 295: [45, 45, 35], 315: [45, 45, 35, 10],
+            345: [45, 45, 35, 25], 365: [45, 45, 35, 25, 10]
+        };
+
+        const getWeekScheme = (weekNum, type) => {
+            const schemes = {
+                1: { primary: { reps: [12, 10, 10, 8], rpe: [6, 7, 7, 8] }, accessory: { sets: 4, reps: 12 } },
+                2: { primary: { reps: [8, 6, 6, 4], rpe: [7, 8, 8, 9] }, accessory: { sets: 4, reps: 10 } },
+                3: { primary: { reps: [5, 3, 2, 1], rpe: [8, 9, 9, 10] }, accessory: { sets: 3, reps: 8 } },
+                4: { primary: { reps: [10, 10, 10], rpe: [5, 5, 5] }, accessory: { sets: 2, reps: 12 } }
+            };
+            return schemes[weekNum] ? schemes[weekNum][type] : schemes[1][type];
+        };
+
+        const BASE_PROGRAMS = [
+            { id: 'day1', name: "Chest & Back", focus: "Arnold Hypertrophy", exercises: [{id:'bench', name:'BB Bench Press', type:'primary'}, {id:'rows', name:'BB Bent Over Rows', type:'primary'}, {id:'incline_db', name:'Incline DB Press', type:'accessory'}, {id:'pullovers', name:'DB Pullovers', type:'accessory'}]},
+            { id: 'day2', name: "Legs", focus: "Mister Squat", exercises: [{id:'squat', name:'Back Squat', type:'primary'}, {id:'rdl', name:'Romanian Deadlift', type:'primary'}, {id:'goblet', name:'Heavy Goblet Squat', type:'accessory'}, {id:'calves', name:'DB Calf Raises', type:'accessory'}]},
+            { id: 'day3', name: "Shoulders & Arms", focus: "Arnold Volume", exercises: [{id:'ohp', name:'Overhead Press', type:'primary'}, {id:'lateral', name:'DB Lateral Raise', type:'accessory'}, {id:'curls', name:'DB Alternate Curls', type:'accessory'}, {id:'triceps', name:'DB Skullcrushers', type:'accessory'}]},
+            { id: 'day4', name: "Deadlift & Pull", focus: "Soflete Power", exercises: [{id:'deadlift', name:'Conventional Deadlift', type:'primary'}, {id:'weighted_pullup', name:'Pullups (Weighted DB)', type:'accessory'}, {id:'shrugs', name:'DB Shrugs', type:'accessory'}]}
+        ];
+
+        const roundToEquipment = (weight, isDB = false) => {
+            if (isDB) return Math.round(Math.min(90, Math.max(5, weight)) / 5) * 5;
+            const possible = Object.keys(BARBELL_LOADS).map(Number);
+            return possible.reduce((prev, curr) => Math.abs(curr - weight) < Math.abs(prev - weight) ? curr : prev);
+        };
+
+        function App() {
+            const [view, setView] = useState('home');
+            const [oneRMs, setOneRMs] = useState({ squat: 225, bench: 185, deadlift: 315, ohp: 135, rows: 155 });
+            const [history, setHistory] = useState([]);
+            const [currentWeek, setCurrentWeek] = useState(1);
+            const [activeWorkout, setActiveWorkout] = useState(null);
+            const [timer, setTimer] = useState(0);
+            const [showSettings, setShowSettings] = useState(false);
+
+            useEffect(() => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.oneRMs) setOneRMs(parsed.oneRMs);
+                    if (parsed.history) setHistory(parsed.history);
+                    if (parsed.currentWeek) setCurrentWeek(parsed.currentWeek);
+                }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ oneRMs, history, currentWeek }));
+            }, [oneRMs, history, currentWeek]);
+
+            useEffect(() => {
+                let interval;
+                if (timer > 0) interval = setInterval(() => setTimer(prev => prev - 1), 1000);
+                return () => clearInterval(interval);
+            }, [timer]);
+
+            const startWorkout = (prog) => {
+                const session = {
+                    id: Date.now(),
+                    name: prog.name,
+                    week: currentWeek,
+                    exercises: prog.exercises.map(ex => {
+                        const scheme = getWeekScheme(currentWeek, ex.type);
+                        const setsCount = ex.type === 'primary' ? scheme.reps.length : scheme.sets;
+                        const sets = Array.from({ length: setsCount }).map((_, i) => {
+                            let targetWeight = 0;
+                            let targetReps = ex.type === 'primary' ? scheme.reps[i] : scheme.reps;
+                            if (ex.type === 'primary') {
+                                const intensity = (scheme.rpe[i] / 10) * (1.0278 - 0.0278 * targetReps);
+                                targetWeight = roundToEquipment(oneRMs[ex.id] * intensity);
+                            } else {
+                                const lastLog = history.flatMap(h => h.exercises).findLast(e => e.id === ex.id);
+                                targetWeight = roundToEquipment(lastLog ? Number(lastLog.sets[0].weight) + 5 : 25, true);
+                            }
+                            return { weight: targetWeight, reps: targetReps, completed: false };
+                        });
+                        return { ...ex, sets };
+                    })
+                };
+                setActiveWorkout(session);
+                setView('active');
+            };
+
+            const toggleSet = (exIdx, setIdx) => {
+                const newWorkout = { ...activeWorkout };
+                newWorkout.exercises[exIdx].sets[setIdx].completed = !newWorkout.exercises[exIdx].sets[setIdx].completed;
+                if (newWorkout.exercises[exIdx].sets[setIdx].completed) setTimer(90);
+                setActiveWorkout(newWorkout);
+            };
+
+            const finishWorkout = () => {
+                const updated1RMs = { ...oneRMs };
+                activeWorkout.exercises.forEach(ex => {
+                    if (ex.type === 'primary') {
+                        const completed = ex.sets.filter(s => s.completed);
+                        if (completed.length) {
+                            const heaviest = Math.max(...completed.map(s => Number(s.weight)));
+                            const best = completed.find(s => Number(s.weight) === heaviest);
+                            const e1rm = Math.round(Number(best.weight) / (1.0278 - 0.0278 * Number(best.reps)));
+                            if (e1rm > (oneRMs[ex.id] || 0)) updated1RMs[ex.id] = e1rm;
+                        }
+                    }
+                });
+                const newHistory = [{...activeWorkout, date: new Date().toLocaleDateString()}, ...history];
+                setHistory(newHistory);
+                setOneRMs(updated1RMs);
+                if (newHistory.filter(h => h.week === currentWeek).length >= 4) {
+                    setCurrentWeek(prev => prev === 4 ? 1 : prev + 1);
+                }
+                setActiveWorkout(null);
+                setView('home');
+            };
+
+            return (
+                <div className="min-h-screen bg-black text-slate-100 font-sans p-4 pb-24 max-w-lg mx-auto">
+                    <header className="flex justify-between items-center mb-6 pt-8 border-b border-slate-900 pb-4">
+                        <div>
+                            <h1 className="text-2xl font-black italic tracking-tighter text-white">IRON <span className="text-blue-500">BLUEPRINT</span></h1>
+                            <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Week {currentWeek} Block</p>
+                        </div>
+                        <button onClick={() => setShowSettings(true)} className="p-2 bg-slate-900 rounded-full border border-slate-800 active:scale-90 transition-transform">
+                            <Icon name="settings" size={20} />
+                        </button>
+                    </header>
+
+                    {view === 'home' && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-2 mb-6">
+                                {['squat', 'bench', 'deadlift', 'ohp'].map(l => (
+                                    <div key={l} className="bg-slate-900 p-3 rounded-2xl border border-slate-800">
+                                        <span className="text-[10px] uppercase text-slate-500 font-bold block">{l}</span>
+                                        <span className="text-xl font-black tracking-tight">{oneRMs[l]} lb</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <h2 className="text-xs uppercase font-black text-slate-600 tracking-widest px-1 italic">Training Sessions</h2>
+                            {BASE_PROGRAMS.map(p => (
+                                <button key={p.id} onClick={() => startWorkout(p)} className="w-full text-left bg-slate-900 p-5 rounded-3xl border border-slate-800 flex justify-between items-center group active:scale-[0.98] transition-all">
+                                    <div>
+                                        <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">{p.focus}</span>
+                                        <h3 className="text-xl font-black mt-1 italic uppercase tracking-tighter">{p.name}</h3>
+                                    </div>
+                                    <Icon name="play" size={24} className="text-blue-500 opacity-20 group-hover:opacity-100" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {view === 'history' && (
+                        <div className="space-y-4">
+                            {history.length === 0 ? <p className="text-center text-slate-600 py-12">No training logs found.</p> : history.map(h => (
+                                <div key={h.id} className="bg-slate-900 p-5 rounded-[2rem] border border-slate-800">
+                                    <h4 className="font-black italic uppercase text-blue-400 tracking-tighter text-lg">{h.name}</h4>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{h.date} • Week {h.week}</p>
+                                    <div className="mt-4 space-y-2">
+                                        {h.exercises.map((e,i) => (
+                                            <div key={i} className="text-xs flex justify-between border-b border-slate-800/50 pb-2 last:border-0 last:pb-0">
+                                                <span className="font-bold text-slate-300">{e.name}</span>
+                                                <span className="text-blue-500 font-mono font-bold uppercase">{e.sets.filter(s=>s.completed).length} sets</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {view === 'active' && activeWorkout && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center sticky top-[88px] z-30 bg-black/80 py-2 backdrop-blur-md">
+                                <h2 className="text-xl font-black italic uppercase tracking-tighter">{activeWorkout.name}</h2>
+                                <button onClick={() => setView('home')} className="text-red-500 text-[10px] font-black uppercase tracking-widest bg-red-500/10 px-3 py-1 rounded-full active:bg-red-500 active:text-white transition-colors">Abort</button>
+                            </div>
+                            {activeWorkout.exercises.map((ex, exIdx) => (
+                                <div key={exIdx} className="bg-slate-900 rounded-[2rem] border border-slate-800 overflow-hidden shadow-2xl">
+                                    <div className="p-4 bg-slate-800/50 border-b border-slate-800 flex justify-between items-center">
+                                        <h3 className="font-black italic uppercase text-sm tracking-tight">{ex.name}</h3>
+                                        <span className="text-[10px] text-slate-500 font-bold uppercase">{ex.type}</span>
+                                    </div>
+                                    <div className="p-2 space-y-1">
+                                        {ex.sets.map((s, si) => (
+                                            <div key={si} className={`flex items-center gap-3 p-3 rounded-2xl transition-all ${s.completed ? 'opacity-40 bg-blue-500/5' : ''}`}>
+                                                <div className="flex-1 flex items-center gap-4">
+                                                    <span className="text-[10px] font-black text-slate-700 italic">#{si+1}</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-2xl font-black tracking-tighter leading-none">{s.weight}<span className="text-[10px] text-slate-600 ml-0.5">lb</span></span>
+                                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{s.reps} reps</span>
+                                                    </div>
+                                                    {BARBELL_LOADS[s.weight] && (
+                                                        <div className="ml-auto flex gap-1 flex-wrap justify-end max-w-[120px]">
+                                                            {BARBELL_LOADS[s.weight].map((p,i)=>(
+                                                                <span key={i} className={`text-[8px] font-black px-1.5 py-0.5 rounded border border-white/5 ${p===45?'bg-red-900/40 text-red-200':'bg-slate-800 text-slate-400'}`}>
+                                                                    {p}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <button onClick={() => toggleSet(exIdx, si)} className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all active:scale-90 ${s.completed ? 'bg-blue-600 border-blue-600 shadow-lg shadow-blue-500/20' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
+                                                    <Icon name="check-circle-2" size={24} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            <button onClick={finishWorkout} className="w-full bg-blue-600 py-6 rounded-3xl font-black italic text-xl tracking-tighter shadow-2xl shadow-blue-900/40 active:scale-95 transition-all uppercase mb-10">FINISH SESSION</button>
+                        </div>
+                    )}
+
+                    {timer > 0 && (
+                        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-blue-600 px-6 py-3 rounded-full flex items-center gap-3 shadow-2xl z-50 animate-pulse border border-blue-400">
+                            <Icon name="timer" size={18} />
+                            <span className="font-mono font-black text-xl tracking-tighter">{Math.floor(timer/60)}:{(timer%60).toString().padStart(2,'0')}</span>
+                            <button onClick={()=>setTimer(0)} className="ml-1 active:scale-75"><Icon name="x" size={14} /></button>
+                        </div>
+                    )}
+
+                    {showSettings && (
+                        <div className="fixed inset-0 bg-black/95 z-[100] p-6 backdrop-blur-xl overflow-y-auto">
+                            <div className="max-w-md mx-auto pb-20">
+                                <div className="flex justify-between items-center mb-10">
+                                    <h2 className="text-2xl font-black italic uppercase underline decoration-blue-500 decoration-8 underline-offset-8 tracking-tighter">Calibration</h2>
+                                    <button onClick={()=>setShowSettings(false)} className="bg-slate-900 p-2 rounded-full"><Icon name="x" size={24}/></button>
+                                </div>
+                                <section className="space-y-10">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-4 block italic">Training Block</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {[1,2,3,4].map(w=><button key={w} onClick={()=>setCurrentWeek(w)} className={`p-5 rounded-2xl font-black transition-all ${currentWeek===w?'bg-blue-600 text-white shadow-xl shadow-blue-500/20':'bg-slate-900 text-slate-500 border border-slate-800'}`}>W{w}</button>)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] mb-4 block italic">1RM Benchmarks (lbs)</label>
+                                        <div className="space-y-2">
+                                            {Object.keys(oneRMs).map(l=>(
+                                                <div key={l} className="flex justify-between items-center bg-slate-900 p-4 rounded-2xl border border-slate-800">
+                                                    <span className="text-xs font-black uppercase text-slate-400 italic tracking-widest">{l}</span>
+                                                    <input type="number" value={oneRMs[l]} onChange={(e)=>setOneRMs({...oneRMs, [l]: parseInt(e.target.value)||0})} className="bg-black border border-slate-700 rounded-xl p-3 w-24 text-right text-blue-400 font-bold font-mono focus:border-blue-500 outline-none transition-colors" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={()=>{if(window.confirm("Wipe all locally stored data?")){localStorage.clear(); window.location.reload();}}} className="w-full py-5 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/20 rounded-2xl mt-10 active:bg-red-500 active:text-white transition-all">Clear Local Cache</button>
+                                </section>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-md border-t border-slate-900 p-4 flex justify-around items-center pb-safe z-40">
+                        <button onClick={() => setView('home')} className={`flex flex-col items-center gap-1 transition-colors active:scale-90 ${view === 'home' ? 'text-blue-500' : 'text-slate-500'}`}>
+                            <Icon name="dumbbell" size={24} />
+                            <span className="text-[9px] font-black uppercase italic tracking-tighter">Train</span>
+                        </button>
+                        <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center -mt-12 border-4 border-black shadow-xl shadow-blue-900/40 active:scale-95 transition-transform">
+                            <Icon name="trending-up" size={28} className="text-white" />
+                        </div>
+                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-colors active:scale-90 ${view === 'history' ? 'text-blue-500' : 'text-slate-500'}`}>
+                            <Icon name="history" size={24} />
+                            <span className="text-[9px] font-black uppercase italic tracking-tighter">History</span>
+                        </button>
+                    </nav>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
