@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,9 +37,6 @@
         };
 
         const STORAGE_KEY = 'iron_blueprint_react_v2';
-        
-        // Provided API Key for GitHub deployment
-        const DEFAULT_API_KEY = "AIzaSyA832U4qJre0n_t0EqyQQL_2M9q8Cy7qd8"; 
 
         const BARBELL_LOADS = {
             45: [], 65: [10], 95: [25], 115: [35], 135: [45],
@@ -89,7 +85,7 @@
                 targetWeight: 205,
                 store: 'Walmart',
                 weeklyBudget: 120,
-                userApiKey: DEFAULT_API_KEY
+                userApiKey: "" // Clean state - user must enter key in UI
             });
 
             const [groceryList, setGroceryList] = useState([]);
@@ -125,8 +121,8 @@
                 const tdee = bmr * 1.725;
                 
                 let targetCals = tdee;
-                if (profile.targetWeight > profile.weight) targetCals += 350;
-                if (profile.targetWeight < profile.weight) targetCals -= 350;
+                if (profile.targetWeight > profile.weight) targetCals += 400;
+                if (profile.targetWeight < profile.weight) targetCals -= 400;
                 
                 const bmi = (profile.weight / (profile.height * profile.height)) * 703;
                 return {
@@ -144,8 +140,8 @@
 
             const generateFuelPlan = async () => {
                 if (!profile.userApiKey) {
-                    setErrorMsg("API Key Missing in Settings.");
-                    setTimeout(() => setErrorMsg(null), 3000);
+                    setErrorMsg("API Key Missing. Add your Gemini key in Settings.");
+                    setTimeout(() => setErrorMsg(null), 5000);
                     return;
                 }
 
@@ -153,12 +149,12 @@
                 const systemPrompt = `You are a high-performance nutritionist AI. 
                 Task: Generate a 7-day efficient grocery list and meal plan for ${profile.store}. 
                 Budget: $${profile.weeklyBudget}. 
-                Goal: Current weight is ${profile.weight}lb, Target is ${profile.targetWeight}lb. 
-                Targets: ${stats.calories} kcal/day.
+                Goal: Move from ${profile.weight}lb to ${profile.targetWeight}lb. 
+                Target: ${stats.calories} kcal/day.
                 
-                Efficiency Mandate: Prioritize bulk, store-brand staples. 
+                Efficiency Mandate: Prioritize bulk staples. 
                 Meal Categories: Breakfast, Lunch, Dinner, Snack.
-                Frequency Requirement: Assign a weekly frequency (e.g., Breakfast 1 is eaten 7 times).
+                Frequency Requirement: Assign a weekly frequency (total times prep/eaten).
                 
                 Return ONLY JSON:
                 {
@@ -166,7 +162,7 @@
                     "recipes": [{"id": 1, "category": "Breakfast|Lunch|Dinner|Snack", "title": "string", "description": "string", "instructions": [], "macros": "string", "frequency": 7}]
                 }`;
 
-                const userQuery = `Create my ${profile.store} plan for $${profile.weeklyBudget} to hit my ${profile.targetWeight}lb goal efficiently.`;
+                const userQuery = `Efficiency plan for ${profile.store} within $${profile.weeklyBudget}.`;
 
                 try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${profile.userApiKey}`, {
@@ -189,8 +185,8 @@
                         checklist: Array(r.frequency).fill(false)
                     })));
                 } catch (err) {
-                    setErrorMsg("AI Sync Error. Check API Key.");
-                    setTimeout(() => setErrorMsg(null), 3000);
+                    setErrorMsg("AI Sync Error. Check API Key or Network.");
+                    setTimeout(() => setErrorMsg(null), 5000);
                 } finally {
                     setIsGenerating(false);
                 }
@@ -211,7 +207,6 @@
                 setGroceryList(groceryList.map(item => item.id === id ? { ...item, bought: !item.bought } : item));
             };
 
-            // Workout Logic
             const startWorkout = (prog) => {
                 const session = {
                     id: Date.now(),
@@ -257,9 +252,8 @@
 
             const toggleSet = (exIdx, setIdx) => {
                 const newWorkout = { ...activeWorkout };
-                const isCompleted = !newWorkout.exercises[exIdx].sets[setIdx].completed;
-                newWorkout.exercises[exIdx].sets[setIdx].completed = isCompleted;
-                if (isCompleted) setTimer(90);
+                newWorkout.exercises[exIdx].sets[setIdx].completed = !newWorkout.exercises[exIdx].sets[setIdx].completed;
+                if (newWorkout.exercises[exIdx].sets[setIdx].completed) setTimer(90);
                 setActiveWorkout(newWorkout);
             };
 
@@ -298,9 +292,9 @@
 
                     <header className="flex justify-between items-center mb-6 pt-8 border-b border-slate-900 pb-4 px-2">
                         <div>
-                            <h1 className="text-2xl font-black italic tracking-tighter text-white uppercase leading-none">IRON <span className="text-blue-500 underline decoration-4 underline-offset-4">BLUEPRINT</span></h1>
+                            <h1 className="text-2xl font-black italic tracking-tighter text-white uppercase leading-none">IRON <span className="text-blue-500">BLUEPRINT</span></h1>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest uppercase">W{currentWeek} {profile.targetWeight > profile.weight ? 'BULK' : 'CUT'}</span>
+                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest uppercase">W{currentWeek}</span>
                                 <div className="h-1 w-1 rounded-full bg-slate-800"></div>
                                 <span className="text-[10px] uppercase font-bold text-blue-400 tracking-widest">GOAL: {profile.targetWeight}LB</span>
                             </div>
@@ -326,7 +320,7 @@
                                             <span className="text-[9px] bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">{p.focus}</span>
                                             <h3 className="text-xl font-black mt-1 italic uppercase tracking-tighter leading-none">{p.name}</h3>
                                         </div>
-                                        <Icon name="play" size={24} className="text-blue-500 opacity-20 group-hover:opacity-100" />
+                                        <Icon name="play" size={24} className="text-blue-500 opacity-20 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
                             </div>
@@ -336,7 +330,7 @@
                     {view === 'nutrition' && (
                         <div className="space-y-8 animate-in fade-in duration-300 pb-10">
                             <div className="glass-card p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
-                                <h2 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em] mb-4 flex items-center gap-2"><Icon name="zap" size={12}/> Met Protocol</h2>
+                                <h2 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em] mb-4 flex items-center gap-2"><Icon name="flame" size={12}/> Met Target</h2>
                                 <div className="flex items-baseline gap-2 mb-6">
                                     <span className="text-5xl font-black italic tracking-tighter">{stats.calories}</span>
                                     <span className="text-xs font-black text-slate-600 uppercase tracking-widest leading-none">KCAL / DAY</span>
@@ -352,12 +346,12 @@
                                 if (!catRecipes.length) return null;
                                 return (
                                     <div key={category} className="space-y-4">
-                                        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] px-2 italic">{category} Frequency</h2>
+                                        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] px-2 italic">{category} Protocol</h2>
                                         {catRecipes.map(r => (
                                             <div key={r.id} className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] shadow-xl">
                                                 <div className="flex justify-between items-start mb-4" onClick={() => setSelectedRecipe(r)}>
                                                     <div className="flex-1 pr-4">
-                                                        <h4 className="font-black text-xl uppercase italic text-blue-400 leading-none tracking-tighter mb-2 underline decoration-blue-500/20">{r.title}</h4>
+                                                        <h4 className="font-black text-xl uppercase italic text-blue-400 leading-none tracking-tighter mb-2">{r.title}</h4>
                                                         <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{r.macros}</span>
                                                     </div>
                                                     <div className="bg-slate-950 px-3 py-1 rounded-full border border-slate-800"><span className="text-[9px] font-black text-slate-400 italic">{r.frequency}X</span></div>
@@ -389,7 +383,7 @@
                                                         {item.bought && <Icon name="check" size={14} className="text-black font-black"/>}
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-black text-sm uppercase italic tracking-tight leading-none mb-1">{item.item}</h4>
+                                                        <h4 className="font-black text-sm uppercase italic tracking-tight mb-1 leading-none">{item.item}</h4>
                                                         <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{item.qty} • {item.category}</span>
                                                     </div>
                                                 </div>
@@ -405,7 +399,7 @@
                     {view === 'history' && (
                         <div className="space-y-4 animate-in fade-in duration-300">
                             <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-2 italic">Intel Logs</h2>
-                            {history.length === 0 ? <p className="p-12 text-center text-slate-700 font-black uppercase italic tracking-widest text-xs border border-dashed border-slate-800 rounded-3xl">No History Logged.</p> : history.map(h => (
+                            {history.length === 0 ? <p className="p-12 text-center text-slate-700 font-black uppercase italic tracking-widest text-xs border border-dashed border-slate-800 rounded-3xl">No Logs Recorded.</p> : history.map(h => (
                                 <div key={h.id} className="bg-slate-900/60 p-6 rounded-[2rem] border border-slate-800 mb-4 shadow-lg">
                                     <h4 className="font-black italic uppercase text-blue-400 tracking-tighter text-lg leading-tight">{h.name}</h4>
                                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{h.date} • Week {h.week}</p>
@@ -428,7 +422,7 @@
                                     </div>
                                     <div className="p-3 space-y-1.5">
                                         {ex.sets.map((s, si) => (
-                                            <div key={si} className={`flex items-center gap-3 p-4 rounded-[1.8rem] transition-all ${s.completed ? 'opacity-30 bg-blue-500/5' : 'bg-slate-950/40 border border-slate-800/50 shadow-inner'}`}>
+                                            <div key={si} className={`flex items-center gap-3 p-4 rounded-[1.8rem] transition-all ${s.completed ? 'opacity-30 bg-blue-500/5' : 'bg-slate-950/40 border border-slate-800/50'}`}>
                                                 <div className="flex-1 flex items-center gap-4">
                                                     <span className="text-[10px] font-black text-slate-700 italic">#{si+1}</span>
                                                     <div className="flex flex-col gap-0.5">
@@ -485,21 +479,21 @@
                                         <div className="bg-slate-900 p-6 rounded-[2rem] border border-slate-800 space-y-4 shadow-xl shadow-green-500/5">
                                             <input 
                                                 type="password" 
-                                                placeholder="Gemini API Key" 
+                                                placeholder="Paste Gemini API Key" 
                                                 value={profile.userApiKey} 
                                                 onChange={(e) => setProfile({...profile, userApiKey: e.target.value})} 
                                                 className="w-full bg-black border border-slate-800 rounded-xl p-4 font-mono text-xs text-blue-400 placeholder:text-slate-800"
                                             />
-                                            <p className="text-[8px] text-slate-600 uppercase font-black tracking-widest text-center">Required for the AI fuel planner to function.</p>
+                                            <p className="text-[8px] text-slate-600 uppercase font-black tracking-widest text-center">Stores locally. Never sent to GitHub.</p>
                                         </div>
                                     </div>
                                     <div className="space-y-6">
-                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em] mb-2 block italic px-1">Performance Goals</label>
+                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em] mb-2 block italic px-1">Performance Stats</label>
                                         <div className="bg-slate-900 p-6 rounded-[2rem] border border-slate-800 space-y-5 shadow-2xl">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <span className="text-[9px] font-black text-slate-600 uppercase block mb-1 tracking-widest">Weight (lb)</span>
-                                                    <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl shadow-inner" />
+                                                    <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl" />
                                                 </div>
                                                 <div>
                                                     <span className="text-[9px] font-black text-blue-500 uppercase block mb-1 tracking-widest">Target (lb)</span>
@@ -507,7 +501,7 @@
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-center bg-black/50 p-4 rounded-2xl border border-slate-800">
-                                                <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Store</span>
+                                                <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Market</span>
                                                 <select value={profile.store} onChange={(e) => setProfile({...profile, store: e.target.value})} className="font-black italic uppercase text-green-500 text-sm outline-none">
                                                     <option value="Walmart">Walmart</option>
                                                     <option value="Costco">Costco</option>
@@ -523,7 +517,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <button onClick={()=>{if(window.confirm("Nuclear Reset?")) {localStorage.clear(); window.location.reload();}}} className="w-full py-5 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/20 rounded-3xl mt-12 active:bg-red-500 active:text-white transition-all shadow-lg">Clear Device Intelligence</button>
+                                    <button onClick={()=>{if(window.confirm("Nuclear Reset?")) {localStorage.clear(); window.location.reload();}}} className="w-full py-5 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/20 rounded-3xl mt-12 active:bg-red-500 active:text-white transition-all shadow-lg">Clear Intelligence</button>
                                 </section>
                             </div>
                         </div>
