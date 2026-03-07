@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,11 +17,13 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: black; color: white; }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-        input[type="number"] { -moz-appearance: textfield; background: transparent; border: none; outline: none; }
+        input[type="number"], input[type="text"], select { -moz-appearance: textfield; background: transparent; border: none; outline: none; color: white; }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .input-focus-effect:focus { border-bottom: 2px solid #3b82f6; }
-        .animate-glow { animation: glow 2s infinite alternate; }
-        @keyframes glow { from { box-shadow: 0 0 5px -5px #3b82f6; } to { box-shadow: 0 0 20px -5px #3b82f6; } }
+        .glass-card { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .meal-checkbox:checked + label { color: #3b82f6; text-decoration: line-through; opacity: 0.5; }
     </style>
 </head>
 <body class="bg-black">
@@ -30,14 +33,12 @@
         const { useState, useEffect, useMemo, useRef } = React;
 
         const Icon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => { lucide.createIcons(); }, [name]);
+            useEffect(() => { lucide.createIcons(); }, [name, className]);
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
         };
 
         const STORAGE_KEY = 'iron_blueprint_react_v2';
-
-        // Your physical inventory limit: 365 lbs
-        const MAX_PHYSICAL_WEIGHT = 365;
+        const apiKey = ""; 
 
         const BARBELL_LOADS = {
             45: [], 65: [10], 95: [25], 115: [35], 135: [45],
@@ -58,19 +59,13 @@
         };
 
         const BASE_PROGRAMS = [
-            { id: 'day1', name: "Day 1: Chest & Back", focus: "Mass & Density", exercises: [{id:'bench', name:'BB Bench Press', type:'primary'}, {id:'rows', name:'BB Bent Over Rows', type:'primary'}, {id:'incline_db', name:'Incline DB Press', type:'accessory'}, {id:'pullovers', name:'DB Pullovers (Arnold Spec)', type:'accessory', note: "Final set: 15 reps + Slow Eccentric"}]},
-            { id: 'day2', name: "Day 2: Legs (Squat)", focus: "Mister Squat High Bar", exercises: [{id:'squat', name:'Back Squat', type:'primary'}, {id:'rdl', name:'Romanian Deadlift', type:'primary'}, {id:'goblet', name:'Heavy Goblet Squat', type:'accessory'}, {id:'calves', name:'DB Calf Raises', type:'accessory', note: "Pause 2s at top"}]},
-            { id: 'day3', name: "Day 3: Shoulders & Arms", focus: "Arnold Volume", exercises: [{id:'ohp', name:'Overhead Press', type:'primary'}, {id:'lateral', name:'DB Lateral Raise', type:'accessory', note: "Final set: Drop Set until failure"}, {id:'curls', name:'DB Alternate Curls', type:'accessory'}, {id:'triceps', name:'DB Skullcrushers', type:'accessory'}, {id:'cardio_liss', name:'LISS Cardio', type:'cardio', sets: 1, reps: '25m'}]},
+            { id: 'day1', name: "Day 1: Chest & Back", focus: "Mass & Density", exercises: [{id:'bench', name:'BB Bench Press', type:'primary'}, {id:'rows', name:'BB Bent Over Rows', type:'primary'}, {id:'incline_db', name:'Incline DB Press', type:'accessory'}, {id:'pullovers', name:'DB Pullovers', type:'accessory', note: "Arnold Finisher: 15 reps"}]},
+            { id: 'day2', name: "Day 2: Legs (Squat)", focus: "Mister Squat", exercises: [{id:'squat', name:'Back Squat', type:'primary'}, {id:'rdl', name:'Romanian Deadlift', type:'primary'}, {id:'goblet', name:'Heavy Goblet Squat', type:'accessory'}, {id:'calves', name:'DB Calf Raises', type:'accessory'}]},
+            { id: 'day3', name: "Day 3: Shoulders & Arms", focus: "Arnold Volume", exercises: [{id:'ohp', name:'Overhead Press', type:'primary'}, {id:'lateral', name:'DB Lateral Raise', type:'accessory'}, {id:'curls', name:'DB Alternate Curls', type:'accessory'}, {id:'triceps', name:'DB Skullcrushers', type:'accessory'}, {id:'cardio_liss', name:'LISS Cardio', type:'cardio', reps: '25m'}]},
             { id: 'day4', name: "Day 4: Chest & Back", focus: "Mass Variation", exercises: [{id:'bench', name:'BB Flat Bench', type:'primary'}, {id:'rows', name:'BB Rows (Underhand)', type:'primary'}, {id:'incline_db', name:'Incline DB Flyes', type:'accessory'}, {id:'db_row_single', name:'Single Arm DB Row', type:'accessory'}]},
-            { id: 'day5', name: "Day 5: Legs (Deadlift)", focus: "Soflete Pull Day", exercises: [{id:'deadlift', name:'Conventional Deadlift', type:'primary'}, {id:'weighted_pullup', name:'Weighted Pullups', type:'accessory'}, {id:'shrugs', name:'DB Shrugs', type:'accessory', note: "High volume: 15+ reps"}, {id:'db_lunge', name:'DB Lunges', type:'accessory'}]},
-            { id: 'day6', name: "Day 6: Shoulders & Arms", focus: "Pump + HIIT", exercises: [{id:'ohp', name:'Seated DB Press', type:'accessory', sets: 4, reps: 10}, {id:'lateral', name:'DB Lateral Raise', type:'accessory'}, {id:'curls', name:'DB Hammer Curls', type:'accessory'}, {id:'triceps', name:'DB Overheads', type:'accessory'}, {id:'cardio_hiit', name:'HIIT Cardio (60/60)', type:'cardio', sets: 1, reps: '15m'}]}
+            { id: 'day5', name: "Day 5: Legs (Deadlift)", focus: "Soflete Pull", exercises: [{id:'deadlift', name:'Conventional Deadlift', type:'primary'}, {id:'weighted_pullup', name:'Weighted Pullups', type:'accessory'}, {id:'shrugs', name:'DB Shrugs', type:'accessory'}, {id:'db_lunge', name:'DB Lunges', type:'accessory'}]},
+            { id: 'day6', name: "Day 6: Shoulders & Arms", focus: "Pump + HIIT", exercises: [{id:'ohp', name:'Seated DB Press', type:'accessory', sets: 4, reps: 10}, {id:'lateral', name:'DB Lateral Raise', type:'accessory'}, {id:'curls', name:'DB Hammer Curls', type:'accessory'}, {id:'triceps', name:'DB Overheads', type:'accessory'}, {id:'cardio_hiit', name:'HIIT Cardio (Sprints)', type:'cardio', reps: '15m'}]}
         ];
-
-        const roundToEquipment = (weight, isDB = false) => {
-            if (isDB) return Math.round(Math.min(90, Math.max(5, weight)) / 5) * 5;
-            const possible = Object.keys(BARBELL_LOADS).map(Number);
-            return possible.reduce((prev, curr) => Math.abs(curr - weight) < Math.abs(prev - weight) ? curr : prev);
-        };
 
         function App() {
             const [view, setView] = useState('home');
@@ -80,6 +75,20 @@
             const [activeWorkout, setActiveWorkout] = useState(null);
             const [timer, setTimer] = useState(0);
             const [showSettings, setShowSettings] = useState(false);
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [selectedRecipe, setSelectedRecipe] = useState(null);
+            
+            const [profile, setProfile] = useState({
+                weight: 195,
+                height: 70,
+                age: 34,
+                targetWeight: 205,
+                store: 'Walmart',
+                weeklyBudget: 120
+            });
+
+            const [groceryList, setGroceryList] = useState([]);
+            const [recipes, setRecipes] = useState([]);
 
             useEffect(() => {
                 const saved = localStorage.getItem(STORAGE_KEY);
@@ -88,12 +97,15 @@
                     if (parsed.oneRMs) setOneRMs(parsed.oneRMs);
                     if (parsed.history) setHistory(parsed.history);
                     if (parsed.currentWeek) setCurrentWeek(parsed.currentWeek);
+                    if (parsed.profile) setProfile(parsed.profile);
+                    if (parsed.groceryList) setGroceryList(parsed.groceryList);
+                    if (parsed.recipes) setRecipes(parsed.recipes);
                 }
             }, []);
 
             useEffect(() => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ oneRMs, history, currentWeek }));
-            }, [oneRMs, history, currentWeek]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ oneRMs, history, currentWeek, profile, groceryList, recipes }));
+            }, [oneRMs, history, currentWeek, profile, groceryList, recipes]);
 
             useEffect(() => {
                 let interval;
@@ -101,15 +113,96 @@
                 return () => clearInterval(interval);
             }, [timer]);
 
+            const stats = useMemo(() => {
+                const weightKg = profile.weight * 0.453592;
+                const heightCm = profile.height * 2.54;
+                const bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * profile.age) + 5;
+                const tdee = bmr * 1.725;
+                let targetCals = tdee;
+                if (profile.targetWeight > profile.weight) targetCals += 400;
+                if (profile.targetWeight < profile.weight) targetCals -= 400;
+                const bmi = (profile.weight / (profile.height * profile.height)) * 703;
+                return {
+                    calories: Math.round(targetCals),
+                    bmi: bmi.toFixed(1),
+                    protein: Math.round(profile.weight * 1.1),
+                    fats: Math.round(profile.weight * 0.4),
+                    carbs: Math.round((targetCals - (profile.weight * 1.1 * 4) - (profile.weight * 0.4 * 9)) / 4)
+                };
+            }, [profile]);
+
+            const groceryTotal = useMemo(() => {
+                return groceryList.reduce((sum, item) => sum + (Number(item.estPrice) || 0), 0);
+            }, [groceryList]);
+
+            const generateFuelPlan = async () => {
+                setIsGenerating(true);
+                const systemPrompt = `You are an elite performance nutritionist. 
+                    Create a 7-day meal plan and grocery list for ${profile.store}. 
+                    Budget: $${profile.weeklyBudget}. 
+                    Target: ${stats.calories} kcal/day for a 195lb athlete moving towards ${profile.targetWeight}lbs.
+                    
+                    Be super efficient: prioritize bulk meats, large bags of rice, frozen veggies, and versatile fats.
+                    Break meals into: Breakfast, Lunch, Dinner, Snack.
+                    Assign "frequency" (total times eaten in a week).
+                    
+                    Return ONLY a JSON object:
+                    {
+                        "groceries": [{"id": 1, "item": "string", "category": "Protein|Carb|Fat|Micro", "qty": "string", "estPrice": 0.00}],
+                        "recipes": [{"id": 1, "category": "Breakfast|Lunch|Dinner|Snack", "title": "string", "description": "string", "instructions": [], "macros": "string", "frequency": 7}]
+                    }`;
+
+                const userQuery = `Efficiency plan for ${profile.store} within $${profile.weeklyBudget}. Current: ${profile.weight}lb, Target: ${profile.targetWeight}lb.`;
+
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: userQuery }] }],
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            generationConfig: { responseMimeType: "application/json" }
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error();
+                    const result = await response.json();
+                    const data = JSON.parse(result.candidates[0].content.parts[0].text);
+                    
+                    setGroceryList(data.groceries.map(g => ({ ...g, bought: false })));
+                    setRecipes(data.recipes.map(r => ({
+                        ...r,
+                        checklist: Array(r.frequency).fill(false)
+                    })));
+                } catch (err) {
+                    console.error("AI Error", err);
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+
+            const toggleMealCheck = (recipeId, index) => {
+                setRecipes(recipes.map(r => {
+                    if (r.id === recipeId) {
+                        const newChecklist = [...r.checklist];
+                        newChecklist[index] = !newChecklist[index];
+                        return { ...r, checklist: newChecklist };
+                    }
+                    return r;
+                }));
+            };
+
+            const toggleGrocery = (id) => {
+                setGroceryList(groceryList.map(item => item.id === id ? { ...item, bought: !item.bought } : item));
+            };
+
             const startWorkout = (prog) => {
                 const session = {
                     id: Date.now(),
                     name: prog.name,
                     week: currentWeek,
                     exercises: prog.exercises.map(ex => {
-                        if (ex.type === 'cardio') {
-                            return { ...ex, sets: [{ weight: 0, reps: ex.reps, completed: false }] };
-                        }
+                        if (ex.type === 'cardio') return { ...ex, sets: [{ weight: 0, reps: ex.reps, completed: false }] };
                         const scheme = getWeekScheme(currentWeek, ex.type);
                         const setsCount = ex.type === 'primary' ? scheme.reps.length : (ex.sets || scheme.sets);
                         const sets = Array.from({ length: setsCount }).map((_, i) => {
@@ -119,8 +212,9 @@
                                 const intensity = (scheme.rpe[i] / 10) * (1.0278 - 0.0278 * targetReps);
                                 targetWeight = roundToEquipment(oneRMs[ex.id] * intensity);
                             } else {
-                                const lastLog = history.flatMap(h => h.exercises).findLast(e => e.id === ex.id);
-                                targetWeight = roundToEquipment(lastLog ? Number(lastLog.sets[0].weight) + 5 : 25, true);
+                                const allEx = history.flatMap(h => h.exercises);
+                                const last = [...allEx].reverse().find(e => e.id === ex.id);
+                                targetWeight = roundToEquipment(last ? Number(last.sets[0].weight) + 5 : 25, true);
                             }
                             return { weight: targetWeight, reps: targetReps, completed: false };
                         });
@@ -134,99 +228,80 @@
             const handleWeightChange = (exIdx, setIdx, newVal) => {
                 const newWorkout = { ...activeWorkout };
                 const weight = parseInt(newVal) || 0;
-                const oldWeight = newWorkout.exercises[exIdx].sets[setIdx].weight;
-                const diff = weight - oldWeight;
-                const isDB = newWorkout.exercises[exIdx].type === 'accessory';
-
+                const diff = weight - newWorkout.exercises[exIdx].sets[setIdx].weight;
                 newWorkout.exercises[exIdx].sets[setIdx].weight = weight;
-
                 for (let i = setIdx + 1; i < newWorkout.exercises[exIdx].sets.length; i++) {
                     if (!newWorkout.exercises[exIdx].sets[i].completed) {
-                        const nextTarget = newWorkout.exercises[exIdx].sets[i].weight + diff;
-                        newWorkout.exercises[exIdx].sets[i].weight = roundToEquipment(nextTarget, isDB);
+                        const next = newWorkout.exercises[exIdx].sets[i].weight + diff;
+                        newWorkout.exercises[exIdx].sets[i].weight = roundToEquipment(next, newWorkout.exercises[exIdx].type === 'accessory');
                     }
                 }
                 setActiveWorkout(newWorkout);
             };
 
-            const handleRepChange = (exIdx, setIdx, newVal) => {
+            const toggleSet = (exIdx, setIdx) => {
                 const newWorkout = { ...activeWorkout };
-                newWorkout.exercises[exIdx].sets[setIdx].reps = newVal;
+                newWorkout.exercises[exIdx].sets[setIdx].completed = !newWorkout.exercises[exIdx].sets[setIdx].completed;
+                if (newWorkout.exercises[exIdx].sets[setIdx].completed) setTimer(90);
                 setActiveWorkout(newWorkout);
             };
 
-            const toggleSet = (exIdx, setIdx) => {
-                const newWorkout = { ...activeWorkout };
-                const isCompleted = !newWorkout.exercises[exIdx].sets[setIdx].completed;
-                newWorkout.exercises[exIdx].sets[setIdx].completed = isCompleted;
-                if (isCompleted) setTimer(90);
-                setActiveWorkout(newWorkout);
+            const roundToEquipment = (weight, isDB = false) => {
+                if (isDB) return Math.round(Math.min(90, Math.max(5, weight)) / 5) * 5;
+                const p = Object.keys(BARBELL_LOADS).map(Number);
+                return p.reduce((a, b) => Math.abs(b - weight) < Math.abs(a - weight) ? b : a);
             };
 
             const finishWorkout = () => {
                 const updated1RMs = { ...oneRMs };
                 activeWorkout.exercises.forEach(ex => {
                     if (ex.type === 'primary') {
-                        const completed = ex.sets.filter(s => s.completed);
-                        if (completed.length) {
-                            const heaviest = Math.max(...completed.map(s => Number(s.weight)));
-                            const best = completed.find(s => Number(s.weight) === heaviest);
+                        const comp = ex.sets.filter(s => s.completed);
+                        if (comp.length) {
+                            const best = comp.reduce((p, c) => (Number(c.weight) > Number(p.weight)) ? c : p);
                             const e1rm = Math.round(Number(best.weight) / (1.0278 - 0.0278 * Number(best.reps)));
                             if (e1rm > (oneRMs[ex.id] || 0)) updated1RMs[ex.id] = e1rm;
                         }
                     }
                 });
-                const newHistory = [{...activeWorkout, date: new Date().toLocaleDateString()}, ...history];
-                setHistory(newHistory);
+                setHistory([{...activeWorkout, date: new Date().toLocaleDateString()}, ...history]);
                 setOneRMs(updated1RMs);
-                if (newHistory.filter(h => h.week === currentWeek).length >= 6) {
-                    setCurrentWeek(prev => prev === 4 ? 1 : prev + 1);
-                }
+                if (history.filter(h => h.week === currentWeek).length >= 5) setCurrentWeek(prev => prev === 4 ? 1 : prev + 1);
                 setActiveWorkout(null);
                 setView('home');
             };
 
             return (
-                <div className="min-h-screen bg-black text-slate-100 font-sans p-4 pb-24 max-w-lg mx-auto selection:bg-blue-500 selection:text-white">
-                    <header className="flex justify-between items-center mb-6 pt-8 border-b border-slate-900 pb-4">
+                <div className="min-h-screen bg-black text-slate-100 font-sans p-4 pb-24 max-w-lg mx-auto overflow-x-hidden">
+                    <header className="flex justify-between items-center mb-6 pt-8 border-b border-slate-900 pb-4 px-2">
                         <div>
-                            <h1 className="text-2xl font-black italic tracking-tighter text-white uppercase">IRON <span className="text-blue-500">BLUEPRINT</span></h1>
+                            <h1 className="text-2xl font-black italic tracking-tighter text-white uppercase leading-none">IRON <span className="text-blue-500">BLUEPRINT</span></h1>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-[0.2em] italic">Pro Performance</span>
-                                <div className="h-1 w-1 rounded-full bg-blue-500"></div>
-                                <span className="text-[10px] uppercase font-bold text-blue-500 tracking-[0.2em]">Week {currentWeek}</span>
+                                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest uppercase">W{currentWeek} {profile.targetWeight > profile.weight ? 'BULK' : 'CUT'}</span>
+                                <div className="h-1 w-1 rounded-full bg-slate-800"></div>
+                                <span className="text-[10px] uppercase font-bold text-blue-400 tracking-widest">GOAL: {profile.targetWeight}LB</span>
                             </div>
                         </div>
-                        <button onClick={() => setShowSettings(true)} className="p-2 bg-slate-900 rounded-full border border-slate-800 active:scale-90 transition-transform shadow-lg shadow-blue-500/10">
-                            <Icon name="settings" size={20} />
-                        </button>
+                        <button onClick={() => setShowSettings(true)} className="p-2 bg-slate-900 rounded-full border border-slate-800 active:scale-90 transition-transform"><Icon name="settings" size={20} /></button>
                     </header>
 
                     {view === 'home' && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 animate-in fade-in duration-300">
                             <div className="grid grid-cols-2 gap-2 mb-6">
                                 {['squat', 'bench', 'deadlift', 'ohp'].map(l => (
-                                    <div key={l} className="bg-slate-900/40 p-4 rounded-2xl border border-slate-800 relative overflow-hidden">
+                                    <div key={l} className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
                                         <span className="text-[10px] uppercase text-slate-500 font-black block mb-1 tracking-widest">{l}</span>
                                         <span className="text-2xl font-black tracking-tight">{oneRMs[l]}<span className="text-xs ml-1 text-slate-600 font-black">LB</span></span>
-                                        {oneRMs[l] >= MAX_PHYSICAL_WEIGHT && l !== 'bench' && l !== 'ohp' && (
-                                            <div className="absolute top-2 right-2 text-amber-500"><Icon name="alert-triangle" size={12}/></div>
-                                        )}
                                     </div>
                                 ))}
                             </div>
-                            
-                            <div className="flex justify-between items-end px-1">
-                                <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] italic">The 6-Day Split</h2>
-                                <span className="text-[9px] font-bold text-slate-700 uppercase">Inventory Limit: {MAX_PHYSICAL_WEIGHT}LB</span>
-                            </div>
-
+                            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-2 italic">Training Cycle</h2>
                             <div className="space-y-3">
                                 {BASE_PROGRAMS.map(p => (
-                                    <button key={p.id} onClick={() => startWorkout(p)} className="w-full text-left bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-[2rem] border border-slate-800 flex justify-between items-center group active:scale-[0.98] transition-all relative overflow-hidden shadow-xl">
+                                    <button key={p.id} onClick={() => startWorkout(p)} className="w-full text-left bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-[2.5rem] border border-slate-800 flex justify-between items-center group active:scale-[0.98] transition-all relative overflow-hidden shadow-xl">
                                         <div className="relative z-10">
                                             <span className="text-[9px] bg-blue-600/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">{p.focus}</span>
-                                            <h3 className="text-xl font-black mt-1 italic uppercase tracking-tighter">{p.name}</h3>
+                                            <h3 className="text-xl font-black mt-1 italic uppercase tracking-tighter leading-none">{p.name}</h3>
                                         </div>
                                         <Icon name="play" size={24} className="text-blue-500 opacity-20 group-hover:opacity-100 transition-opacity" />
                                     </button>
@@ -235,21 +310,78 @@
                         </div>
                     )}
 
-                    {view === 'history' && (
-                        <div className="space-y-4">
-                            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-1 italic">Training Intel</h2>
-                            {history.length === 0 ? <p className="text-center text-slate-600 py-12 italic">No data logged yet.</p> : history.map(h => (
-                                <div key={h.id} className="bg-slate-900/60 p-6 rounded-[2rem] border border-slate-800">
-                                    <h4 className="font-black italic uppercase text-blue-400 tracking-tighter text-lg leading-tight">{h.name}</h4>
-                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{h.date} • Week {h.week}</p>
-                                    <div className="mt-4 space-y-2">
-                                        {h.exercises.map((e,i) => (
-                                            <div key={i} className="text-xs flex justify-between border-b border-slate-800/50 pb-2 last:border-0 last:pb-0 items-center">
-                                                <span className="font-bold text-slate-300">{e.name}</span>
-                                                <span className="text-blue-500 font-mono font-bold uppercase text-[10px] bg-blue-500/5 px-2 py-1 rounded-md">{e.sets.filter(s=>s.completed).length}/{e.sets.length} sets</span>
+                    {view === 'nutrition' && (
+                        <div className="space-y-8 animate-in fade-in duration-300 pb-10">
+                            <div className="glass-card p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                                <h2 className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em] mb-4 flex items-center gap-2"><Icon name="flame" size={12}/> Protocol Target</h2>
+                                <div className="flex items-baseline gap-2 mb-6">
+                                    <span className="text-5xl font-black italic tracking-tighter">{stats.calories}</span>
+                                    <span className="text-sm font-black text-slate-600 uppercase tracking-widest leading-none">KCAL / DAY</span>
+                                </div>
+                                <button onClick={generateFuelPlan} disabled={isGenerating} className="w-full bg-blue-600 py-5 rounded-2xl font-black italic uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:bg-slate-800">
+                                    {isGenerating ? <Icon name="loader-2" size={18} className="animate-spin" /> : <Icon name="sparkles" size={18} />}
+                                    {isGenerating ? 'Analyzing Market...' : `Generate Weekly ${profile.store} Plan`}
+                                </button>
+                            </div>
+
+                            {recipes.length > 0 && ['Breakfast', 'Lunch', 'Dinner', 'Snack'].map(category => {
+                                const catRecipes = recipes.filter(r => r.category === category);
+                                if (!catRecipes.length) return null;
+                                return (
+                                    <div key={category} className="space-y-4">
+                                        <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] px-2 italic">{category} Protocol</h2>
+                                        {catRecipes.map(r => (
+                                            <div key={r.id} className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] shadow-xl">
+                                                <div className="flex justify-between items-start mb-4" onClick={() => setSelectedRecipe(r)}>
+                                                    <div className="flex-1 pr-4">
+                                                        <h4 className="font-black text-xl uppercase italic text-blue-400 leading-none tracking-tighter mb-2">{r.title}</h4>
+                                                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{r.macros}</span>
+                                                    </div>
+                                                    <div className="bg-slate-950 px-3 py-1 rounded-full border border-slate-800 whitespace-nowrap"><span className="text-[10px] font-black text-slate-400">{r.frequency}X WEEKLY</span></div>
+                                                </div>
+                                                <div className="flex gap-2 flex-wrap mt-4 border-t border-slate-800/50 pt-5">
+                                                    {r.checklist.map((checked, idx) => (
+                                                        <button key={idx} onClick={() => toggleMealCheck(r.id, idx)} className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${checked ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-950 text-slate-700 border border-slate-800 shadow-inner'}`}>
+                                                            {checked ? <Icon name="check" size={20} /> : <span className="text-[10px] font-black opacity-30 italic">#{idx + 1}</span>}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
+                                );
+                            })}
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center px-2">
+                                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] italic">Grocery Manifest</h2>
+                                    <span className="text-[10px] font-black text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">EST. TOTAL: ${groceryTotal.toFixed(2)}</span>
+                                </div>
+                                {groceryList.map(item => (
+                                    <div key={item.id} onClick={() => toggleGrocery(item.id)} className={`flex items-center justify-between p-5 rounded-[2rem] border transition-all ${item.bought ? 'bg-slate-900/20 border-slate-900 opacity-40' : 'bg-slate-900 border-slate-800 shadow-lg'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${item.bought ? 'bg-green-500 border-green-500 shadow-lg' : 'border-slate-700'}`}>
+                                                {item.bought && <Icon name="check" size={14} className="text-black"/>}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-black text-sm uppercase italic tracking-tight">{item.item}</h4>
+                                                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{item.qty} • {item.category}</span>
+                                            </div>
+                                        </div>
+                                        {!item.bought && item.estPrice && <span className="text-[10px] font-black text-green-500">${item.estPrice.toFixed(2)}</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'history' && (
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                            <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-2 italic">Intel Logs</h2>
+                            {history.map(h => (
+                                <div key={h.id} className="bg-slate-900/60 p-6 rounded-[2rem] border border-slate-800 mb-4 shadow-lg">
+                                    <h4 className="font-black italic uppercase text-blue-400 tracking-tighter text-lg leading-tight">{h.name}</h4>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{h.date} • Week {h.week}</p>
                                 </div>
                             ))}
                         </div>
@@ -257,149 +389,129 @@
 
                     {view === 'active' && activeWorkout && (
                         <div className="space-y-6 pb-24">
-                            <div className="flex justify-between items-center sticky top-[80px] z-30 bg-black/90 py-3 backdrop-blur-md">
+                            <div className="flex justify-between items-center sticky top-[80px] z-30 bg-black/95 py-4 backdrop-blur-md px-2">
                                 <h2 className="text-xl font-black italic uppercase tracking-tighter">{activeWorkout.name}</h2>
-                                <button onClick={() => { if(confirm("Discard current progress?")) setView('home') }} className="text-red-500 text-[9px] font-black uppercase tracking-widest bg-red-500/10 px-3 py-1.5 rounded-full active:bg-red-500 active:text-white transition-colors">Discard</button>
+                                <button onClick={() => setView('home')} className="text-red-500 text-[9px] font-black uppercase tracking-widest bg-red-500/10 px-3 py-1.5 rounded-full">Abort</button>
                             </div>
                             {activeWorkout.exercises.map((ex, exIdx) => (
-                                <div key={exIdx} className="bg-slate-900/80 rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl">
+                                <div key={exIdx} className="bg-slate-900 rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl">
                                     <div className="p-5 bg-slate-800/40 border-b border-slate-800 flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-black italic uppercase text-sm tracking-tight leading-tight">{ex.name}</h3>
-                                            {ex.note && <p className="text-[9px] text-blue-400 uppercase font-black tracking-widest mt-1 opacity-80">{ex.note}</p>}
-                                        </div>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${ex.type === 'cardio' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-slate-950/50 text-slate-500 border border-slate-800'}`}>{ex.type}</span>
+                                        <h3 className="font-black italic uppercase text-sm tracking-tight">{ex.name}</h3>
+                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${ex.type === 'cardio' ? 'bg-green-500/10 text-green-500' : 'bg-slate-950/50 text-slate-500'}`}>{ex.type}</span>
                                     </div>
-                                    <div className="p-3 space-y-2">
-                                        {ex.sets.map((s, si) => {
-                                            const plateCalc = ex.type === 'primary' && BARBELL_LOADS[s.weight] ? BARBELL_LOADS[s.weight] : null;
-                                            const weightLimitWarning = ex.type === 'primary' && s.weight >= MAX_PHYSICAL_WEIGHT;
-
-                                            return (
-                                                <div key={si} className={`flex items-center gap-3 p-4 rounded-3xl transition-all ${s.completed ? 'opacity-30 bg-blue-500/5' : 'bg-slate-950/40 border border-slate-800/50 shadow-inner'}`}>
-                                                    <div className="flex-1 flex items-center gap-4">
-                                                        <span className="text-[10px] font-black text-slate-700 italic">#{si+1}</span>
-                                                        <div className="flex flex-col gap-0.5">
-                                                            {ex.type === 'cardio' ? (
-                                                                <input 
-                                                                    type="text" 
-                                                                    value={s.reps}
-                                                                    onChange={(e) => handleRepChange(exIdx, si, e.target.value)}
-                                                                    className="text-2xl font-black tracking-tighter leading-none text-green-400 w-full"
-                                                                />
-                                                            ) : (
-                                                                <div className="flex items-baseline gap-1">
-                                                                    <input 
-                                                                        type="number" 
-                                                                        value={s.weight}
-                                                                        onChange={(e) => handleWeightChange(exIdx, si, e.target.value)}
-                                                                        className={`text-3xl font-black tracking-tighter leading-none w-20 input-focus-effect ${weightLimitWarning ? 'text-amber-500' : 'text-white'}`}
-                                                                    />
-                                                                    <span className="text-[10px] text-slate-600 font-black">LB</span>
-                                                                </div>
-                                                            )}
-                                                            <div className="flex items-center gap-1">
-                                                                {ex.type !== 'cardio' && (
-                                                                    <input 
-                                                                        type="number" 
-                                                                        value={s.reps}
-                                                                        onChange={(e) => handleRepChange(exIdx, si, e.target.value)}
-                                                                        className="text-[10px] font-black text-slate-500 uppercase tracking-tighter w-8 input-focus-effect"
-                                                                    />
-                                                                )}
-                                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">{ex.type === 'cardio' ? 'Block Duration' : 'Reps Target'}</span>
-                                                                {weightLimitWarning && <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter ml-2 italic">Max Plates - Go Slow Tempo</span>}
-                                                            </div>
+                                    <div className="p-3 space-y-1.5">
+                                        {ex.sets.map((s, si) => (
+                                            <div key={si} className={`flex items-center gap-3 p-4 rounded-[1.8rem] transition-all ${s.completed ? 'opacity-30 bg-blue-500/5' : 'bg-slate-950/40 border border-slate-800/50'}`}>
+                                                <div className="flex-1 flex items-center gap-4">
+                                                    <span className="text-[10px] font-black text-slate-700 italic">#{si+1}</span>
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <div className="flex items-baseline gap-1">
+                                                            <input type="number" value={s.weight} onChange={(e) => handleWeightChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-20 input-focus-effect" />
+                                                            <span className="text-[10px] text-slate-600 font-black uppercase tracking-tighter">LB</span>
                                                         </div>
-                                                        {plateCalc && s.weight > 0 && (
-                                                            <div className="ml-auto flex gap-1 flex-wrap justify-end max-w-[100px]">
-                                                                {plateCalc.map((p,i)=>(
-                                                                    <span key={i} className={`text-[8px] font-black px-1.5 py-0.5 rounded border border-white/5 shadow-sm ${p===45?'bg-red-900/60 text-red-200 border-red-500/20':'bg-slate-800 text-slate-400'}`}>
-                                                                        {p}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-tighter">Target: {s.reps} Reps</span>
                                                     </div>
-                                                    <button onClick={() => toggleSet(exIdx, si)} className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all active:scale-90 shadow-xl ${s.completed ? 'bg-blue-600 border-blue-600 shadow-blue-500/40' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
-                                                        <Icon name="check-circle-2" size={28} />
-                                                    </button>
                                                 </div>
-                                            );
-                                        })}
+                                                <button onClick={() => toggleSet(exIdx, si)} className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-all ${s.completed ? 'bg-blue-600 border-blue-600 shadow-xl shadow-blue-500/40' : 'bg-slate-800 border-slate-700 text-slate-500'}`}><Icon name="check-circle-2" size={28} /></button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             ))}
-                            <button onClick={finishWorkout} className="w-full bg-blue-600 py-6 rounded-[2rem] font-black italic text-xl tracking-tighter shadow-2xl shadow-blue-900/40 active:scale-95 transition-all uppercase mb-10 border-t border-blue-400/30">FINISH SESSION</button>
+                            <button onClick={finishWorkout} className="w-full bg-blue-600 py-6 rounded-[2.5rem] font-black italic text-xl tracking-tighter shadow-2xl active:scale-95 transition-all uppercase mb-10">FINISH SESSION</button>
                         </div>
                     )}
 
-                    {timer > 0 && (
-                        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-blue-600 px-6 py-4 rounded-full flex items-center gap-4 shadow-2xl z-50 animate-pulse border border-blue-400 ring-4 ring-blue-600/20 animate-glow">
-                            <Icon name="timer" size={20} />
-                            <span className="font-mono font-black text-2xl tracking-tighter italic leading-none">{Math.floor(timer/60)}:{(timer%60).toString().padStart(2,'0')}</span>
-                            <button onClick={()=>setTimer(0)} className="bg-blue-700 rounded-full p-1 active:scale-75"><Icon name="x" size={16} /></button>
+                    {selectedRecipe && (
+                        <div className="fixed inset-0 bg-black/95 z-[200] p-6 backdrop-blur-xl flex flex-col items-center justify-center">
+                            <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 overflow-y-auto max-h-[80vh] custom-scroll relative">
+                                <button onClick={() => setSelectedRecipe(null)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full"><Icon name="x" size={20}/></button>
+                                <h3 className="text-2xl font-black italic text-blue-500 uppercase leading-none tracking-tighter mb-4 pr-10">{selectedRecipe.title}</h3>
+                                <p className="text-slate-400 text-xs mb-6 uppercase font-bold tracking-widest leading-relaxed italic">{selectedRecipe.description}</p>
+                                <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 mb-6">
+                                    <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Icon name="list" size={10}/> Weekly Preparation</h5>
+                                    <ul className="space-y-4">
+                                        {selectedRecipe.instructions.map((step, i) => (
+                                            <li key={i} className="text-sm font-medium text-slate-200 flex gap-4 leading-snug">
+                                                <span className="text-blue-500 font-black italic">{i+1}</span> {step}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div className="text-center font-black italic text-green-500 uppercase tracking-[0.2em] text-xs py-4 bg-green-500/5 rounded-2xl border border-green-500/10">
+                                    Protocol: {selectedRecipe.macros}
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     {showSettings && (
                         <div className="fixed inset-0 bg-black/98 z-[100] p-6 backdrop-blur-3xl overflow-y-auto">
-                            <div className="max-w-md mx-auto pb-20 pt-10">
-                                <div className="flex justify-between items-center mb-10">
+                            <div className="max-w-md mx-auto pb-20 pt-10 px-2">
+                                <div className="flex justify-between items-center mb-12">
                                     <h2 className="text-2xl font-black italic uppercase underline decoration-blue-500 decoration-8 underline-offset-8 tracking-tighter">Pro Config</h2>
                                     <button onClick={()=>setShowSettings(false)} className="bg-slate-900 p-2 rounded-full border border-slate-800 shadow-xl"><Icon name="x" size={24}/></button>
                                 </div>
                                 <section className="space-y-12">
-                                    <div className="bg-blue-500/5 border border-blue-500/20 p-5 rounded-3xl">
-                                        <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <Icon name="user" size={12}/> Profile: Intermediate-Advanced
-                                        </h3>
-                                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Current Plan: Arnold Blueprint x Soflete Hybrid. Managed RPE enabled.</p>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em] mb-6 block italic px-1">Training Block</label>
-                                        <div className="grid grid-cols-4 gap-3">
-                                            {['Hyper', 'Power', 'Str', 'Del'].map((name, i)=>(
-                                                <button key={i} onClick={() => setCurrentWeek(i+1)} className={`p-5 rounded-2xl font-black transition-all border flex flex-col items-center gap-1 ${currentWeek===(i+1)?'bg-blue-600 text-white border-blue-500 shadow-xl shadow-blue-500/20':'bg-slate-900 text-slate-600 border-slate-800'}`}>
-                                                    <span className="text-[8px] uppercase tracking-widest leading-none mb-1 opacity-70">{name}</span>
-                                                    <span className="leading-none">W{i+1}</span>
-                                                </button>
-                                            ))}
+                                    <div className="space-y-6">
+                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em] mb-2 block italic px-1">Performance Profile</label>
+                                        <div className="bg-slate-900 p-6 rounded-[2rem] border border-slate-800 space-y-5 shadow-2xl">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <span className="text-[9px] font-black text-slate-600 uppercase block mb-1 tracking-widest">Weight (lb)</span>
+                                                    <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl" />
+                                                </div>
+                                                <div>
+                                                    <span className="text-[9px] font-black text-blue-500 uppercase block mb-1 tracking-widest">Target (lb)</span>
+                                                    <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-black/50 p-4 rounded-2xl">
+                                                <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Market</span>
+                                                <select value={profile.store} onChange={(e) => setProfile({...profile, store: e.target.value})} className="font-black italic uppercase text-green-500 text-sm outline-none">
+                                                    <option value="Walmart">Walmart</option>
+                                                    <option value="Costco">Costco</option>
+                                                    <option value="Aldi">Aldi</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-black/50 p-4 rounded-2xl">
+                                                <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Weekly Cap</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-green-500 font-black">$</span>
+                                                    <input type="number" value={profile.weeklyBudget} onChange={(e)=>setProfile({...profile, weeklyBudget: parseInt(e.target.value)||0})} className="w-16 text-right font-black text-lg" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em] mb-6 block italic px-1">1RM Benchmarks (lbs)</label>
+                                        <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.4em] block italic px-1 mb-6">Benchmarks (1RM)</label>
                                         <div className="space-y-3">
                                             {Object.keys(oneRMs).map(l=>(
-                                                <div key={l} className="flex justify-between items-center bg-slate-900 p-5 rounded-3xl border border-slate-800/60 shadow-inner">
+                                                <div key={l} className="flex justify-between items-center bg-slate-900 p-5 rounded-3xl border border-slate-800">
                                                     <span className="text-xs font-black uppercase text-slate-500 italic tracking-widest">{l}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <input type="number" value={oneRMs[l]} onChange={(e)=>setOneRMs({...oneRMs, [l]: parseInt(e.target.value)||0})} className="bg-black/50 border border-slate-700 rounded-xl p-3 w-24 text-right text-blue-400 font-bold font-mono focus:border-blue-500 outline-none transition-colors" />
-                                                        <span className="text-[10px] font-black text-slate-700">LB</span>
-                                                    </div>
+                                                    <input type="number" value={oneRMs[l]} onChange={(e)=>setOneRMs({...oneRMs, [l]: parseInt(e.target.value)||0})} className="bg-black border border-slate-700 rounded-xl p-3 w-24 text-right font-bold text-blue-400" />
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
-                                    <button onClick={()=>{if(window.confirm("Nuclear Option: Delete all history and benchmarks?")){localStorage.clear(); window.location.reload();}}} className="w-full py-5 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/10 rounded-3xl mt-12 active:bg-red-500 active:text-white transition-all shadow-lg">Wipe Local Storage</button>
+                                    <button onClick={()=>{if(window.confirm("Nuclear Reset?")) {localStorage.clear(); window.location.reload();}}} className="w-full py-5 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/20 rounded-3xl active:bg-red-500 active:text-white transition-all">Factory Reset</button>
                                 </section>
                             </div>
                         </div>
                     )}
 
-                    <nav className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-slate-900 p-4 flex justify-around items-center pb-safe z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] px-8">
-                        <button onClick={() => setView('home')} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${view === 'home' ? 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'text-slate-700'}`}>
-                            <Icon name="dumbbell" size={24} />
+                    <nav className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-slate-900 p-4 flex justify-around items-center pb-safe z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] px-8">
+                        <button onClick={() => setView('home')} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${view === 'home' ? 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]' : 'text-slate-700'}`}>
+                            <Icon name="dumbbell" size={22} />
                             <span className="text-[9px] font-black uppercase italic tracking-widest">Train</span>
                         </button>
-                        <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center -mt-16 border-[6px] border-black shadow-2xl shadow-blue-900/60 active:scale-95 transition-transform ring-4 ring-black ring-offset-0 relative">
-                            <Icon name="trending-up" size={32} className="text-white" />
-                            <div className="absolute -bottom-1 w-1 h-1 bg-white rounded-full opacity-50"></div>
-                        </div>
-                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${view === 'history' ? 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'text-slate-700'}`}>
-                            <Icon name="history" size={24} />
-                            <span className="text-[9px] font-black uppercase italic tracking-widest">History</span>
+                        <button onClick={() => setView('nutrition')} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${view === 'nutrition' ? 'text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'text-slate-700'}`}>
+                            <Icon name="refrigerator" size={22} />
+                            <span className="text-[9px] font-black uppercase italic tracking-widest">Fuel</span>
+                        </button>
+                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-all active:scale-90 ${view === 'history' ? 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]' : 'text-slate-700'}`}>
+                            <Icon name="history" size={22} />
+                            <span className="text-[9px] font-black uppercase italic tracking-widest">Intel</span>
                         </button>
                     </nav>
                 </div>
