@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,7 +32,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Safe Icon rendering to prevent React DOM crashes on mobile
+        // Safe Icon rendering
         const Icon = ({ name, size = 24, className = "" }) => {
             const iconRef = useRef(null);
             useEffect(() => {
@@ -48,7 +47,7 @@
             return <span ref={iconRef} className="inline-flex items-center justify-center"></span>;
         };
 
-        const STORAGE_KEY = 'iron_blueprint_react_v6';
+        const STORAGE_KEY = 'iron_blueprint_react_v7'; // Bumped version for new schema structure
 
         const BARBELL_LOADS = {
             45: [], 65: [10], 95: [25], 115: [35], 135: [45],
@@ -59,14 +58,14 @@
         };
 
         const EXERCISE_ALTERNATIVES = {
-            'bench': [{id:'db_bench', name:'DB Bench Press'}, {id:'machine_press', name:'Machine Chest Press'}],
-            'squat': [{id:'front_squat', name:'Front Squat'}, {id:'leg_press', name:'Leg Press'}],
-            'deadlift': [{id:'sumo_dl', name:'Sumo Deadlift'}, {id:'trap_bar_dl', name:'Trap Bar Deadlift'}],
-            'ohp': [{id:'db_shoulder_press', name:'DB Shoulder Press'}, {id:'machine_shoulder', name:'Machine Shoulder'}],
-            'rows': [{id:'db_row', name:'DB Row'}, {id:'cable_row', name:'Seated Cable Row'}],
-            'incline_db': [{id:'incline_bb', name:'Incline BB Press'}, {id:'pec_deck', name:'Pec Deck Flyes'}],
-            'curls': [{id:'cable_curls', name:'Cable Curls'}, {id:'bb_curls', name:'BB Bicep Curls'}],
-            'triceps': [{id:'tricep_pushdown', name:'Cable Pushdowns'}, {id:'dips', name:'Dips'}]
+            'bench': [{id:'db_bench', name:'DB Bench Press'}, {id:'machine_press', name:'Machine Chest Press'}, {id:'floor_press', name:'Floor Press'}],
+            'squat': [{id:'front_squat', name:'Front Squat'}, {id:'leg_press', name:'Leg Press'}, {id:'hack_squat', name:'Hack Squat'}, {id:'goblet_squat', name:'Goblet Squat'}],
+            'deadlift': [{id:'sumo_dl', name:'Sumo Deadlift'}, {id:'trap_bar_dl', name:'Trap Bar Deadlift'}, {id:'rdl', name:'RDL'}, {id:'db_deadlift', name:'DB Deadlift'}],
+            'ohp': [{id:'db_shoulder_press', name:'DB Shoulder Press'}, {id:'machine_shoulder', name:'Machine Shoulder'}, {id:'arnold_press', name:'Arnold Press'}],
+            'rows': [{id:'db_row', name:'DB Row'}, {id:'cable_row', name:'Seated Cable Row'}, {id:'t_bar_row', name:'T-Bar Row'}],
+            'incline_db': [{id:'incline_bb', name:'Incline BB Press'}, {id:'pec_deck', name:'Pec Deck Flyes'}, {id:'cable_crossover', name:'Cable Crossovers'}],
+            'curls': [{id:'cable_curls', name:'Cable Curls'}, {id:'bb_curls', name:'BB Bicep Curls'}, {id:'hammer_curls', name:'Hammer Curls'}],
+            'triceps': [{id:'tricep_pushdown', name:'Cable Pushdowns'}, {id:'dips', name:'Dips'}, {id:'skullcrushers', name:'Skullcrushers'}]
         };
 
         const getWeekScheme = (weekNum, type) => {
@@ -79,21 +78,32 @@
             return schemes[weekNum] ? schemes[weekNum][type] : schemes[1][type];
         };
 
-        // Safe Audio Beep System
+        // GLOBAL AUDIO CONTEXT (Prevents browser hardware crash)
+        let globalAudioCtx = null;
+        
+        const initAudio = () => {
+            if (!globalAudioCtx) {
+                globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (globalAudioCtx.state === 'suspended') {
+                globalAudioCtx.resume();
+            }
+        };
+
         const playBeep = () => {
             try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gainNode = ctx.createGain();
+                if (!globalAudioCtx) initAudio();
+                const osc = globalAudioCtx.createOscillator();
+                const gainNode = globalAudioCtx.createGain();
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, ctx.currentTime);
-                gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.frequency.setValueAtTime(800, globalAudioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.5, globalAudioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, globalAudioCtx.currentTime + 0.5);
                 osc.connect(gainNode);
-                gainNode.connect(ctx.destination);
+                gainNode.connect(globalAudioCtx.destination);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.5);
-            } catch (e) { console.log("Audio not supported yet."); }
+                osc.stop(globalAudioCtx.currentTime + 0.5);
+            } catch (e) { console.log("Audio exception", e); }
         };
 
         function App() {
@@ -117,6 +127,7 @@
             // Modals
             const [historyModal, setHistoryModal] = useState(null);
             const [swapModal, setSwapModal] = useState(null); 
+            const [customExerciseName, setCustomExerciseName] = useState(""); 
             const [selectedRecipe, setSelectedRecipe] = useState(null);
             const [abortModal, setAbortModal] = useState(false);
             const [resetModal, setResetModal] = useState(false);
@@ -126,8 +137,9 @@
             // AI Oracle State
             const [showAiChat, setShowAiChat] = useState(false);
             const [aiInput, setAiInput] = useState("");
-            const [aiHistory, setAiHistory] = useState([{role: 'ai', text: "I am Iron Oracle. I can adjust your benchmarks, your profile, or rewrite your entire workout program (like adding warmups or cardio). What do you need?", action: null}]);
+            const [aiHistory, setAiHistory] = useState([{role: 'ai', text: "I am Iron Oracle. I can adjust your benchmarks, your profile, or rewrite your entire workout program. What do you need?", action: null}]);
             const [isAiTyping, setIsAiTyping] = useState(false);
+            const chatEndRef = useRef(null); // Ref for smooth scrolling
 
             const [profile, setProfile] = useState({
                 weight: 195,
@@ -162,8 +174,12 @@
                         if (parsed.profile) setProfile(prev => ({...prev, ...parsed.profile}));
                         if (parsed.groceryList) setGroceryList(parsed.groceryList);
                         if (parsed.recipes) setRecipes(parsed.recipes);
+                        if (parsed.activeWorkout) setActiveWorkout(parsed.activeWorkout);
+                        if (parsed.workoutStartTime) setWorkoutStartTime(parsed.workoutStartTime);
+                        
                         if (parsed.hasOnboarded) {
                             setHasOnboarded(true);
+                            if (parsed.activeWorkout) setView('active');
                         } else {
                             setView('onboarding');
                         }
@@ -176,10 +192,12 @@
                 }
             }, []);
 
-            // Save Data
+            // Save Data (Now includes activeWorkout to prevent session loss on refresh)
             useEffect(() => {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ programs, oneRMs, history, currentWeek, profile, groceryList, recipes, hasOnboarded }));
-            }, [programs, oneRMs, history, currentWeek, profile, groceryList, recipes, hasOnboarded]);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+                    programs, oneRMs, history, currentWeek, profile, groceryList, recipes, hasOnboarded, activeWorkout, workoutStartTime 
+                }));
+            }, [programs, oneRMs, history, currentWeek, profile, groceryList, recipes, hasOnboarded, activeWorkout, workoutStartTime]);
 
             // Timer Hook
             useEffect(() => {
@@ -195,6 +213,13 @@
                 return () => clearInterval(interval);
             }, [timer]);
 
+            // Auto-scroll AI Chat efficiently
+            useEffect(() => {
+                if (showAiChat && chatEndRef.current) {
+                    chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+                }
+            }, [aiHistory, isAiTyping, showAiChat]);
+
             const roundToEquipment = (weight, isDB = false) => {
                 if (isDB) return Math.round(Math.min(90, Math.max(5, weight)) / 5) * 5;
                 const p = Object.keys(BARBELL_LOADS).map(Number);
@@ -202,8 +227,6 @@
             };
 
             // ---- ONBOARDING AI GENERATOR ----
-            const [isGeneratingProgram, setIsGeneratingProgram] = useState(false);
-            
             const generateCustomWorkout = async () => {
                 if (!profile.userApiKey) {
                     setErrorMsg("API Key required to generate custom protocol.");
@@ -217,11 +240,11 @@
                 User: Age ${profile.age}, Current Weight: ${profile.weight}lb, Goal Weight: ${profile.targetWeight}lb.
                 Goals: ${profile.goals || "General Strength & Hypertrophy"}.
                 Preferred Program Style: ${profile.programStyle || "Balanced Split"}.
-                Equipment Access: ${profile.gymMember ? "Full Commercial Gym Access (Assume all machines/barbells available)" : "Home/Limited Equipment: " + profile.equipment}.
+                Equipment Access: ${profile.gymMember ? "Full Commercial Gym Access" : "Home/Limited Equipment: " + profile.equipment}.
                 Current 1RMs: Squat ${oneRMs.squat}lb, Bench ${oneRMs.bench}lb, Deadlift ${oneRMs.deadlift}lb, OHP ${oneRMs.ohp}lb, Rows ${oneRMs.rows}lb.
 
                 RULES:
-                1. Output ONLY a valid JSON object containing an array of daily workouts. Do not wrap in markdown (like \`\`\`json).
+                1. Output ONLY a valid JSON object.
                 2. Structure must be:
                 {
                     "programs": [
@@ -230,16 +253,18 @@
                             "name": "Push Day", 
                             "focus": "Hypertrophy", 
                             "exercises": [
+                                {"id": "warmup_shoulders", "name": "Band Dislocates", "type": "warmup", "sets": 2, "reps": "15 reps"},
                                 {"id": "bench", "name": "BB Bench Press", "type": "primary"}, 
                                 {"id": "db_flys", "name": "DB Flys", "type": "accessory", "sets": 4, "reps": 12},
-                                {"id": "treadmill", "name": "Incline Walk", "type": "cardio", "sets": 1, "reps": "20m"}
+                                {"id": "treadmill", "name": "Incline Walk", "type": "cardio", "sets": 1, "reps": "20m"},
+                                {"id": "stretch_chest", "name": "Pec Wall Stretch", "type": "cooldown", "sets": 1, "reps": "2m"}
                             ]
                         }
                     ]
                 }
-                3. "type" MUST be exactly one of: "primary", "accessory", or "cardio". 
-                4. Primary exercises automatically receive periodized scaling, DO NOT specify sets/reps for primary.
-                5. Accessory and cardio MUST have "sets" and "reps" specified ("reps" for cardio is usually duration like "15m").`;
+                3. "type" MUST be exactly: "primary", "accessory", "cardio", "warmup", or "cooldown". 
+                4. CRITICAL: For 'primary' exercises, use exact IDs: 'squat', 'bench', 'deadlift', 'ohp', or 'rows'.
+                5. Do NOT specify sets/reps for primary.`;
 
                 try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${profile.aiModel}:generateContent?key=${profile.userApiKey}`, {
@@ -260,14 +285,15 @@
                     if (!jsonMatch) throw new Error("AI Format Error");
                     
                     const data = JSON.parse(jsonMatch[0]);
-                    if (data.programs && data.programs.length > 0) {
+                    // Safe parsing
+                    if (data.programs && Array.isArray(data.programs) && data.programs.length > 0) {
                         setPrograms(data.programs);
                         setHasOnboarded(true);
                         setView('home');
                         setCurrentWeek(1);
                         setHistory([]);
                     } else {
-                        throw new Error("No programs generated.");
+                        throw new Error("No valid programs found in AI response.");
                     }
                 } catch (err) {
                     setErrorMsg(`Generation Error: ${err.message}`);
@@ -277,29 +303,37 @@
                 }
             };
 
-
             // ---- WORKOUT LOGIC ----
             const startWorkout = (prog) => {
+                // High Efficiency History Lookup: Flatten once
+                const allPastExercises = history.flatMap(h => h.exercises).reverse();
+
                 const session = {
                     id: prog.id,
                     instanceId: Date.now(),
                     name: prog.name,
                     week: currentWeek,
                     exercises: prog.exercises.map(ex => {
-                        if (ex.type === 'cardio') return { ...ex, sets: [{ weight: 0, reps: ex.reps || "15m", completed: false }] };
+                        if (['cardio', 'warmup', 'cooldown', 'stretch'].includes(ex.type)) {
+                            return { ...ex, sets: [{ weight: 0, reps: ex.reps || "5m", completed: false }] };
+                        }
                         
                         const scheme = getWeekScheme(currentWeek, ex.type);
-                        const setsCount = ex.type === 'primary' ? scheme.reps.length : (ex.sets || scheme.sets || 3);
+                        const isAiArray = Array.isArray(ex.sets);
+                        const setsCount = isAiArray ? ex.sets.length : (ex.type === 'primary' ? scheme.reps.length : (ex.sets || scheme.sets || 3));
+                        
                         const sets = Array.from({ length: setsCount }).map((_, i) => {
-                            let targetWeight = 0;
-                            let targetReps = ex.type === 'primary' ? scheme.reps[i] : (ex.reps || scheme.reps || 10);
+                            const aiSet = isAiArray ? ex.sets[i] : null;
+                            let targetWeight = aiSet?.weight || ex.weight || 0;
+                            let targetReps = aiSet?.reps || (ex.type === 'primary' ? scheme.reps[i] : (ex.reps || scheme.reps || 10));
                             
-                            if (ex.type === 'primary') {
-                                targetWeight = roundToEquipment((oneRMs[ex.id] || 100) * (scheme.rpe[i] / 10) * (1.0278 - 0.0278 * targetReps));
-                            } else {
-                                const allEx = history.reduce((acc, h) => acc.concat(h.exercises), []);
-                                const last = [...allEx].reverse().find(e => e.id === ex.id);
-                                targetWeight = roundToEquipment(last ? Number(last.sets[0].weight) + 5 : 25, true);
+                            if (!targetWeight) {
+                                if (ex.type === 'primary') {
+                                    targetWeight = roundToEquipment((oneRMs[ex.id] || 100) * ((scheme.rpe?.[i] || 8) / 10) * (1.0278 - 0.0278 * targetReps));
+                                } else {
+                                    const last = allPastExercises.find(e => e.id === ex.id);
+                                    targetWeight = roundToEquipment(last ? Number(last.sets[0].weight) + 5 : 25, true);
+                                }
                             }
                             return { weight: targetWeight, reps: targetReps, completed: false };
                         });
@@ -313,13 +347,20 @@
 
             const handleWeightChange = (exIdx, setIdx, newVal) => {
                 const newWorkout = { ...activeWorkout };
-                const weight = parseInt(newVal) || 0;
-                const diff = weight - newWorkout.exercises[exIdx].sets[setIdx].weight;
+                // Allow empty string for UX typing, fallback to 0 in math
+                const weight = newVal === '' ? '' : (parseInt(newVal) || 0);
+                const safeWeightMath = weight === '' ? 0 : weight;
+                
+                const oldWeight = newWorkout.exercises[exIdx].sets[setIdx].weight;
+                const safeOldWeight = oldWeight === '' ? 0 : oldWeight;
+                const diff = safeWeightMath - safeOldWeight;
+                
                 newWorkout.exercises[exIdx].sets[setIdx].weight = weight;
-                // Cascade down
+                
                 for (let i = setIdx + 1; i < newWorkout.exercises[exIdx].sets.length; i++) {
                     if (!newWorkout.exercises[exIdx].sets[i].completed) {
-                        newWorkout.exercises[exIdx].sets[i].weight = roundToEquipment(newWorkout.exercises[exIdx].sets[i].weight + diff, newWorkout.exercises[exIdx].type === 'accessory');
+                        const currentFollowing = newWorkout.exercises[exIdx].sets[i].weight === '' ? 0 : newWorkout.exercises[exIdx].sets[i].weight;
+                        newWorkout.exercises[exIdx].sets[i].weight = roundToEquipment(currentFollowing + diff, newWorkout.exercises[exIdx].type === 'accessory');
                     }
                 }
                 setActiveWorkout(newWorkout);
@@ -332,12 +373,11 @@
             };
 
             const toggleSet = (exIdx, setIdx) => {
+                initAudio(); // Required context unlock before timer triggers
                 const newWorkout = { ...activeWorkout };
                 newWorkout.exercises[exIdx].sets[setIdx].completed = !newWorkout.exercises[exIdx].sets[setIdx].completed;
                 if (newWorkout.exercises[exIdx].sets[setIdx].completed) {
                     setTimer(90);
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if(AudioContext) { const tempCtx = new AudioContext(); tempCtx.resume(); }
                 }
                 setActiveWorkout(newWorkout);
             };
@@ -364,8 +404,8 @@
                     if (ex.type === 'primary') {
                         const comp = ex.sets.filter(s => s.completed);
                         if (comp.length) {
-                            const best = comp.reduce((p, c) => (Number(c.weight) > Number(p.weight)) ? c : p);
-                            const e1rm = Math.round(Number(best.weight) / (1.0278 - 0.0278 * Number(best.reps)));
+                            const best = comp.reduce((p, c) => (Number(c.weight || 0) > Number(p.weight || 0)) ? c : p);
+                            const e1rm = Math.round(Number(best.weight || 0) / (1.0278 - 0.0278 * Number(best.reps || 1)));
                             if (e1rm > (oneRMs[ex.id] || 0)) updated1RMs[ex.id] = e1rm;
                         }
                     }
@@ -437,8 +477,8 @@
                     if (!jsonMatch) throw new Error("Format Error");
                     
                     const data = JSON.parse(jsonMatch[0]);
-                    setGroceryList(data.groceries.map(g => ({ ...g, bought: false })));
-                    setRecipes(data.recipes.map(r => ({ ...r, checklist: Array(r.frequency).fill(false) })));
+                    setGroceryList((data.groceries || []).map(g => ({ ...g, bought: false })));
+                    setRecipes((data.recipes || []).map(r => ({ ...r, checklist: Array(r.frequency || 1).fill(false) })));
                 } catch (err) {
                     setErrorMsg(`Sync Error: Check Key/Network.`);
                     setTimeout(() => setErrorMsg(null), 5000);
@@ -453,7 +493,7 @@
                     setTimeout(() => setErrorMsg(null), 4000); 
                     return;
                 }
-                setFuelUpdateModal(true); // Open pre-flight check
+                setFuelUpdateModal(true); 
             };
 
             const toggleMealCheck = (recipeId, index) => {
@@ -479,7 +519,7 @@
                     text += `Protocol: ${r.category}\n`;
                     text += `Targets: ${r.macros}\n`;
                     text += `Prep:\n`;
-                    r.instructions.forEach((step, i) => {
+                    (r.instructions || []).forEach((step, i) => {
                         text += `  ${i+1}. ${step}\n`;
                     });
                 });
@@ -521,10 +561,12 @@
                 Current Recipes: ${JSON.stringify(recipes)}.
 
                 Analyze request. You can propose setting adjustments, modify the workout program structure, OR adjust the grocery list and recipes.
-                If the user asks to add warmups, cardio, or new exercises, rewrite the Current Workout Programs array appropriately and use UPDATE_PROGRAMS.
-                If the user asks to change foods, swap ingredients, or adjust meals, rewrite the Current Groceries and Current Recipes arrays appropriately and use UPDATE_NUTRITION. Ensure groceries have "bought": false and recipes have "checklist": [array of false booleans matching frequency].
                 
-                Output ONLY valid JSON, no markdown wrappers:
+                If adding warmups/cooldowns: Ensure they biomechanically match the session. Add to 'exercises' array with "type": "warmup" or "cooldown".
+                If overriding weights/reps for a specific exercise: Add 'weight' and 'reps' properties to that specific exercise in the Current Workout Programs array and use UPDATE_PROGRAMS.
+                If adjusting nutrition: Rewrite Current Groceries and Current Recipes appropriately and use UPDATE_NUTRITION.
+                
+                Output ONLY valid JSON:
                 {
                     "reply": "Your response",
                     "action": null OR {
@@ -565,23 +607,18 @@
                 } else if (action.type === 'UPDATE_PROFILE') {
                     setProfile(prev => ({...prev, [action.payload.key]: action.payload.value}));
                 } else if (action.type === 'UPDATE_PROGRAMS') {
-                    setPrograms(action.payload);
+                    setPrograms(action.payload || []);
                 } else if (action.type === 'UPDATE_NUTRITION') {
-                    setGroceryList(action.payload.groceries);
-                    setRecipes(action.payload.recipes);
+                    setGroceryList(action.payload.groceries || []);
+                    setRecipes(action.payload.recipes || []);
                 }
                 setAiHistory(prev => prev.map((msg, i) => i === idx ? {...msg, action: {...msg.action, resolved: true}} : msg));
-            };
-
-            const isWorkoutCompletedThisWeek = (progId) => {
-                return history.find(h => h.id === progId && h.week === currentWeek);
             };
 
             // ---- ONBOARDING RENDERER ----
             if (view === 'onboarding') {
                 return (
                     <div className="min-h-screen bg-black text-slate-100 p-6 flex flex-col justify-center items-center relative overflow-hidden">
-                        {/* Background styling */}
                         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-900/20 to-black pointer-events-none"></div>
                         
                         <div className="w-full max-w-sm relative z-10 slide-up">
@@ -604,7 +641,7 @@
                                             placeholder="Paste API Key Here" 
                                             value={profile.userApiKey} 
                                             onChange={(e) => setProfile({...profile, userApiKey: e.target.value})} 
-                                            className="w-full bg-black border border-slate-700 rounded-xl p-4 font-mono text-xs text-indigo-400 placeholder:text-slate-700 focus:border-indigo-500"
+                                            className="w-full bg-black border border-slate-700 rounded-xl p-4 font-mono text-xs text-indigo-400 placeholder:text-slate-700 focus:border-indigo-500 outline-none"
                                         />
                                     </div>
                                     <button onClick={() => {
@@ -620,16 +657,16 @@
                                         <h3 className="text-xs font-black uppercase text-indigo-400 mb-4 flex items-center gap-2"><Icon name="activity" size={14}/> Biometrics</h3>
                                         <div>
                                             <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Age</span>
-                                            <input type="number" value={profile.age} onChange={(e)=>setProfile({...profile, age: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-3 font-black text-white text-lg" />
+                                            <input type="number" value={profile.age} onChange={(e)=>setProfile({...profile, age: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-3 font-black text-white text-lg outline-none" />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Weight (lb)</span>
-                                                <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-3 font-black text-white text-lg" />
+                                                <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-3 font-black text-white text-lg outline-none" />
                                             </div>
                                             <div>
                                                 <span className="text-[9px] font-black text-indigo-400 uppercase block mb-1 tracking-widest">Target (lb)</span>
-                                                <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-indigo-900/50 rounded-xl p-3 font-black text-white text-lg shadow-[0_0_15px_rgba(79,70,229,0.1)]" />
+                                                <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-indigo-900/50 rounded-xl p-3 font-black text-white text-lg shadow-[0_0_15px_rgba(79,70,229,0.1)] outline-none" />
                                             </div>
                                         </div>
                                     </div>
@@ -668,11 +705,11 @@
                                         <h3 className="text-xs font-black uppercase text-indigo-400 mb-2 flex items-center gap-2"><Icon name="target" size={14}/> Protocol Paradigm</h3>
                                         <div>
                                             <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Specific Goals</span>
-                                            <input type="text" placeholder="e.g. increase vert, bigger arms" value={profile.goals} onChange={(e)=>setProfile({...profile, goals: e.target.value})} className="w-full bg-black border border-slate-800 rounded-xl p-3 text-xs text-white" />
+                                            <input type="text" placeholder="e.g. increase vert, bigger arms" value={profile.goals} onChange={(e)=>setProfile({...profile, goals: e.target.value})} className="w-full bg-black border border-slate-800 rounded-xl p-3 text-xs text-white outline-none" />
                                         </div>
                                         <div>
                                             <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Style / Preferred Split</span>
-                                            <input type="text" placeholder="e.g. PPL, 4-day bro split" value={profile.programStyle} onChange={(e)=>setProfile({...profile, programStyle: e.target.value})} className="w-full bg-black border border-slate-800 rounded-xl p-3 text-xs text-white" />
+                                            <input type="text" placeholder="e.g. PPL, 4-day bro split" value={profile.programStyle} onChange={(e)=>setProfile({...profile, programStyle: e.target.value})} className="w-full bg-black border border-slate-800 rounded-xl p-3 text-xs text-white outline-none" />
                                         </div>
                                         
                                         <div className="pt-4 border-t border-slate-800">
@@ -685,7 +722,7 @@
                                         {!profile.gymMember && (
                                             <div className="animate-in slide-in-from-top-2">
                                                 <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Home Equipment List</span>
-                                                <input type="text" placeholder="e.g. dumbbells up to 50lb, bench" value={profile.equipment} onChange={(e)=>setProfile({...profile, equipment: e.target.value})} className="w-full bg-black border border-slate-800 rounded-xl p-3 text-xs text-white" />
+                                                <input type="text" placeholder="e.g. dumbbells up to 50lb, bench" value={profile.equipment} onChange={(e)=>setProfile({...profile, equipment: e.target.value})} className="w-full bg-black border border-slate-800 rounded-xl p-3 text-xs text-white outline-none" />
                                             </div>
                                         )}
                                     </div>
@@ -792,7 +829,7 @@
                                                     <div className="bg-slate-950 px-3 py-1 rounded-full border border-slate-800"><span className="text-[9px] font-black text-slate-400 italic uppercase">{r.frequency}X</span></div>
                                                 </div>
                                                 <div className="flex gap-2 flex-wrap mt-4 border-t border-slate-800/50 pt-5">
-                                                    {r.checklist.map((checked, idx) => (
+                                                    {(r.checklist || []).map((checked, idx) => (
                                                         <button key={idx} onClick={() => toggleMealCheck(r.id, idx)} className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${checked ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/40' : 'bg-slate-950 text-slate-700 border border-slate-800 shadow-inner'}`}>
                                                             {checked ? <Icon name="check" size={20} /> : <span className="text-[10px] font-black opacity-30 italic">#{idx + 1}</span>}
                                                         </button>
@@ -870,12 +907,11 @@
                                             {ex.note && <p className="text-[9px] text-blue-400 uppercase font-black tracking-widest mt-1 opacity-80 italic">{ex.note}</p>}
                                         </div>
                                         <div className="flex flex-col items-end gap-2">
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${ex.type === 'cardio' ? 'bg-green-500/10 text-green-500' : 'bg-slate-950/50 text-slate-500'}`}>{ex.type}</span>
-                                            {EXERCISE_ALTERNATIVES[ex.id] && (
-                                                <button onClick={() => setSwapModal({exIdx, currentId: ex.id})} className="text-[9px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md active:scale-95">
-                                                    <Icon name="refresh-cw" size={10} /> Swap
-                                                </button>
-                                            )}
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${['cardio','warmup','cooldown','stretch'].includes(ex.type) ? 'bg-green-500/10 text-green-500' : 'bg-slate-950/50 text-slate-500'}`}>{ex.type}</span>
+                                            
+                                            <button onClick={() => setSwapModal({exIdx, currentId: ex.id})} className="text-[9px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded-md active:scale-95">
+                                                <Icon name="refresh-cw" size={10} /> Swap
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="p-3 space-y-1.5">
@@ -887,19 +923,19 @@
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-[10px] font-black text-slate-700 italic w-4">#{si+1}</span>
                                                         <div className="flex items-baseline gap-4">
-                                                            {ex.type === 'cardio' ? (
+                                                            {['cardio', 'warmup', 'cooldown', 'stretch'].includes(ex.type) ? (
                                                                 <div className="flex items-baseline gap-1 w-full">
-                                                                    <input type="text" value={s.reps} onChange={(e) => handleRepChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-24 input-focus-effect bg-transparent text-green-400" />
-                                                                    <span className="text-[10px] text-slate-500 font-black uppercase tracking-tighter">Duration</span>
+                                                                    <input type="text" value={s.reps} onChange={(e) => handleRepChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-24 input-focus-effect bg-transparent text-green-400 outline-none" />
+                                                                    <span className="text-[10px] text-slate-500 font-black uppercase tracking-tighter">Amount</span>
                                                                 </div>
                                                             ) : (
                                                                 <React.Fragment>
                                                                     <div className="flex items-baseline gap-1">
-                                                                        <input type="number" value={s.weight} onChange={(e) => handleWeightChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-16 input-focus-effect bg-transparent text-right" />
+                                                                        <input type="number" value={s.weight === 0 ? '' : s.weight} placeholder="0" onChange={(e) => handleWeightChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-16 input-focus-effect bg-transparent text-right outline-none" />
                                                                         <span className="text-[10px] text-slate-600 font-black uppercase tracking-tighter">LB</span>
                                                                     </div>
                                                                     <div className="flex items-baseline gap-1">
-                                                                        <input type="number" value={s.reps} onChange={(e) => handleRepChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-12 input-focus-effect bg-transparent text-right text-slate-300" />
+                                                                        <input type="number" value={s.reps === 0 ? '' : s.reps} placeholder="0" onChange={(e) => handleRepChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-12 input-focus-effect bg-transparent text-right text-slate-300 outline-none" />
                                                                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-tighter">Reps</span>
                                                                     </div>
                                                                 </React.Fragment>
@@ -920,7 +956,7 @@
                                             </div>
                                         )})}
                                     </div>
-                                    <button onClick={() => addSet(exIdx)} className="w-full py-3 bg-slate-950 text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-800 flex justify-center items-center gap-2 border-t border-slate-800 transition-colors">
+                                    <button onClick={() => addSet(exIdx)} className="w-full py-3 bg-slate-950 text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-800 flex justify-center items-center gap-2 border-t border-slate-800 transition-colors outline-none">
                                         <Icon name="plus" size={14} /> Add Set
                                     </button>
                                 </div>
@@ -932,16 +968,43 @@
                     {/* Swap Modal */}
                     {swapModal && (
                         <div className="fixed inset-0 bg-black/95 z-[200] p-6 backdrop-blur-xl flex flex-col items-center justify-center">
-                            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6">
-                                <h3 className="text-xl font-black italic uppercase tracking-tighter mb-4 text-center text-amber-500">Select Variant</h3>
-                                <div className="space-y-3">
-                                    {EXERCISE_ALTERNATIVES[swapModal.currentId].map(alt => (
-                                        <button key={alt.id} onClick={() => applySwap(swapModal.exIdx, alt.id, alt.name)} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl font-black uppercase text-sm italic tracking-tight active:scale-95 text-slate-300 hover:text-white hover:border-amber-500/50">
+                            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 shadow-2xl">
+                                <h3 className="text-xl font-black italic uppercase tracking-tighter mb-4 text-center text-amber-500">Swap Exercise</h3>
+                                
+                                <div className="space-y-2 max-h-[40vh] overflow-y-auto custom-scroll pr-2 mb-4">
+                                    {EXERCISE_ALTERNATIVES[swapModal.currentId] ? EXERCISE_ALTERNATIVES[swapModal.currentId].map(alt => (
+                                        <button key={alt.id} onClick={() => { applySwap(swapModal.exIdx, alt.id, alt.name); setCustomExerciseName(''); }} className="w-full bg-slate-950 border border-slate-800 p-4 rounded-2xl font-black uppercase text-sm italic tracking-tight active:scale-95 text-slate-300 hover:text-white hover:border-amber-500/50 transition-colors">
                                             {alt.name}
                                         </button>
-                                    ))}
-                                    <button onClick={() => setSwapModal(null)} className="w-full mt-4 text-slate-500 text-xs font-black uppercase tracking-widest p-4">Cancel</button>
+                                    )) : <p className="text-xs text-slate-500 text-center font-bold">No standard alternatives found.</p>}
                                 </div>
+
+                                <div className="border-t border-slate-800 pt-4 mt-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2 block">Custom Alternative</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Enter custom exercise..." 
+                                            value={customExerciseName} 
+                                            onChange={(e) => setCustomExerciseName(e.target.value)}
+                                            className="flex-1 bg-black border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
+                                        />
+                                        <button 
+                                            onClick={() => {
+                                                if(customExerciseName.trim()) {
+                                                    applySwap(swapModal.exIdx, 'custom_' + Date.now(), customExerciseName.trim());
+                                                    setCustomExerciseName('');
+                                                }
+                                            }}
+                                            disabled={!customExerciseName.trim()}
+                                            className="bg-amber-600 text-black px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            Apply
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button onClick={() => { setSwapModal(null); setCustomExerciseName(''); }} className="w-full mt-4 text-slate-500 text-xs font-black uppercase tracking-widest p-4">Cancel</button>
                             </div>
                         </div>
                     )}
@@ -964,7 +1027,7 @@
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {completedSets.map((s, idx) => (
                                                         <div key={idx} className="bg-slate-950 p-2 rounded-lg text-center border border-slate-800">
-                                                            {ex.type === 'cardio' ? (
+                                                            {['cardio', 'warmup', 'cooldown', 'stretch'].includes(ex.type) ? (
                                                                 <span className="block text-xs font-black text-green-400">{s.reps}</span>
                                                             ) : (
                                                                 <React.Fragment>
@@ -993,7 +1056,7 @@
                                 <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 mb-6">
                                     <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Icon name="list" size={10}/> Weekly Prep</h5>
                                     <ul className="space-y-4">
-                                        {selectedRecipe.instructions.map((step, i) => (
+                                        {(selectedRecipe.instructions || []).map((step, i) => (
                                             <li key={i} className="text-sm font-medium text-slate-200 flex gap-4 leading-snug">
                                                 <span className="text-blue-500 font-black italic">{i+1}</span> {step}
                                             </li>
@@ -1017,11 +1080,11 @@
                                 <div className="space-y-4 mb-8">
                                     <div>
                                         <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Current Weight (lb)</span>
-                                        <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-4 font-black text-white text-xl text-center" />
+                                        <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-4 font-black text-white text-xl text-center outline-none focus:border-blue-500" />
                                     </div>
                                     <div>
                                         <span className="text-[9px] font-black text-blue-500 uppercase block mb-1 tracking-widest">Target Weight (lb)</span>
-                                        <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-4 font-black text-white text-xl text-center shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
+                                        <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-xl p-4 font-black text-white text-xl text-center shadow-[0_0_15px_rgba(59,130,246,0.1)] outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
 
@@ -1054,7 +1117,7 @@
                                                     placeholder="Paste Key" 
                                                     value={profile.userApiKey} 
                                                     onChange={(e) => setProfile({...profile, userApiKey: e.target.value})} 
-                                                    className="w-full bg-black border border-slate-800 rounded-xl p-4 font-mono text-xs text-blue-400 placeholder:text-slate-800 shadow-inner"
+                                                    className="w-full bg-black border border-slate-800 rounded-xl p-4 font-mono text-xs text-blue-400 placeholder:text-slate-800 shadow-inner outline-none focus:border-blue-500"
                                                 />
                                             </div>
                                             <div>
@@ -1063,7 +1126,7 @@
                                                     type="text" 
                                                     value={profile.aiModel} 
                                                     onChange={(e) => setProfile({...profile, aiModel: e.target.value})} 
-                                                    className="w-full bg-black border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-400 shadow-inner"
+                                                    className="w-full bg-black border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-400 shadow-inner outline-none focus:border-blue-500"
                                                 />
                                             </div>
                                         </div>
@@ -1074,16 +1137,16 @@
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <span className="text-[9px] font-black text-slate-600 uppercase block mb-1 tracking-widest">Weight (lb)</span>
-                                                    <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl" />
+                                                    <input type="number" value={profile.weight} onChange={(e)=>setProfile({...profile, weight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl outline-none focus:border-blue-500" />
                                                 </div>
                                                 <div>
                                                     <span className="text-[9px] font-black text-blue-500 uppercase block mb-1 tracking-widest">Target (lb)</span>
-                                                    <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
+                                                    <input type="number" value={profile.targetWeight} onChange={(e)=>setProfile({...profile, targetWeight: parseInt(e.target.value)||0})} className="w-full bg-black border border-slate-800 rounded-2xl p-4 font-black text-white text-xl shadow-[0_0_15px_rgba(59,130,246,0.1)] outline-none focus:border-blue-500" />
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-center bg-black/50 p-4 rounded-2xl border border-slate-800">
                                                 <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Store</span>
-                                                <select value={profile.store} onChange={(e) => setProfile({...profile, store: e.target.value})} className="font-black italic uppercase text-green-500 text-sm outline-none">
+                                                <select value={profile.store} onChange={(e) => setProfile({...profile, store: e.target.value})} className="bg-transparent font-black italic uppercase text-green-500 text-sm outline-none">
                                                     <option value="Walmart">Walmart</option>
                                                     <option value="Costco">Costco</option>
                                                     <option value="Aldi">Aldi</option>
@@ -1093,7 +1156,7 @@
                                                 <span className="text-xs font-black uppercase text-slate-500 tracking-widest">Weekly Budget</span>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-green-500 font-black">$</span>
-                                                    <input type="number" value={profile.weeklyBudget} onChange={(e)=>setProfile({...profile, weeklyBudget: parseInt(e.target.value)||0})} className="w-16 text-right font-black text-lg" />
+                                                    <input type="number" value={profile.weeklyBudget} onChange={(e)=>setProfile({...profile, weeklyBudget: parseInt(e.target.value)||0})} className="w-16 text-right font-black text-lg outline-none focus:border-b-2 focus:border-green-500" />
                                                 </div>
                                             </div>
                                         </div>
@@ -1104,7 +1167,7 @@
                                             {Object.keys(oneRMs).map(l=>(
                                                 <div key={l} className="flex justify-between items-center bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-inner">
                                                     <span className="text-xs font-black uppercase text-slate-500 italic tracking-widest">{l}</span>
-                                                    <input type="number" value={oneRMs[l]} onChange={(e)=>setOneRMs({...oneRMs, [l]: parseInt(e.target.value)||0})} className="bg-black border border-slate-700 rounded-xl p-3 w-24 text-right font-bold text-blue-400" />
+                                                    <input type="number" value={oneRMs[l]} onChange={(e)=>setOneRMs({...oneRMs, [l]: parseInt(e.target.value)||0})} className="bg-black border border-slate-700 rounded-xl p-3 w-24 text-right font-bold text-blue-400 outline-none focus:border-blue-500" />
                                                 </div>
                                             ))}
                                         </div>
@@ -1150,11 +1213,11 @@
                                                     <div className="mb-3 space-y-2">
                                                         <div>
                                                             <span className="text-[9px] font-black uppercase text-green-500 block">Pros</span>
-                                                            <ul className="text-xs list-disc pl-4 text-slate-300 leading-snug">{msg.action.pros.map((p, i)=><li key={i}>{p}</li>)}</ul>
+                                                            <ul className="text-xs list-disc pl-4 text-slate-300 leading-snug">{(msg.action.pros || []).map((p, i)=><li key={i}>{p}</li>)}</ul>
                                                         </div>
                                                         <div>
                                                             <span className="text-[9px] font-black uppercase text-red-500 block mt-2">Cons</span>
-                                                            <ul className="text-xs list-disc pl-4 text-slate-300 leading-snug">{msg.action.cons.map((c, i)=><li key={i}>{c}</li>)}</ul>
+                                                            <ul className="text-xs list-disc pl-4 text-slate-300 leading-snug">{(msg.action.cons || []).map((c, i)=><li key={i}>{c}</li>)}</ul>
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-2 pt-2 border-t border-slate-800">
@@ -1182,6 +1245,7 @@
                                         </div>
                                     </div>
                                 )}
+                                <div ref={chatEndRef} />
                             </div>
 
                             <div className="p-4 border-t border-slate-800 bg-slate-950 pb-safe">
@@ -1192,9 +1256,9 @@
                                         onChange={(e) => setAiInput(e.target.value)}
                                         onKeyPress={(e) => e.key === 'Enter' && sendAiMessage()}
                                         placeholder="Ex: Add 15m cardio after every session"
-                                        className="flex-1 bg-slate-900 border border-slate-800 rounded-full px-4 py-3 text-sm focus:border-indigo-500"
+                                        className="flex-1 bg-slate-900 border border-slate-800 rounded-full px-4 py-3 text-sm focus:border-indigo-500 outline-none"
                                     />
-                                    <button onClick={sendAiMessage} disabled={isAiTyping} className="bg-indigo-600 w-12 h-12 rounded-full flex items-center justify-center active:scale-90 disabled:opacity-50 text-white">
+                                    <button onClick={sendAiMessage} disabled={isAiTyping} className="bg-indigo-600 w-12 h-12 rounded-full flex items-center justify-center active:scale-90 disabled:opacity-50 text-white outline-none">
                                         <Icon name="send" size={18} className="ml-1"/>
                                     </button>
                                 </div>
