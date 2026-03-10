@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -161,6 +160,7 @@
             const [recipes, setRecipes] = useState([]);
             const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
             const [copied, setCopied] = useState(false);
+            const [isGeneratingProgram, setIsGeneratingProgram] = useState(false);
 
             // Load Data
             useEffect(() => {
@@ -256,10 +256,15 @@
                             "exercises": [
                                 {"id": "warmup_shoulders", "name": "Band Dislocates", "type": "warmup", "sets": 2, "reps": "15 reps"},
                                 {"id": "bench", "name": "BB Bench Press", "type": "primary"}, 
-                                {"id": "db_flys", "name": "DB Flys", "type": "accessory", "sets": 4, "reps": 12},
+                                {"id": "db_flys", "name": "DB Flys", "type": "accessory", "sets": 4, "reps": "12"},
                                 {"id": "treadmill", "name": "Incline Walk", "type": "cardio", "sets": 1, "reps": "20m"},
                                 {"id": "stretch_chest", "name": "Pec Wall Stretch", "type": "cooldown", "sets": 1, "reps": "2m"}
                             ]
+                        }
+                    ]
+                }
+                3. "type" MUST be exactly: "primary", "accessory", "cardio", "warmup", or "cooldown". 
+                4. CRITICAL: For 'primary' exercises, use exact IDs: 'squat', 'bench', 'deadlift', 'ohp', or 'rows'.
                 5. Do NOT specify sets/reps for primary.
                 6. If creating warmups, cooldowns, or stretches: analyze the 'focus' and 'exercises' of that specific day. Ensure the added movements specifically prep or recover the exact muscle groups used that day (e.g. hip mobility for Squat day, shoulder/thoracic for Push day).`;
 
@@ -316,7 +321,9 @@
                     week: currentWeek,
                     exercises: prog.exercises.map(ex => {
                         if (['cardio', 'warmup', 'cooldown', 'stretch'].includes(ex.type)) {
-                            return { ...ex, sets: [{ weight: 0, reps: ex.reps || "5m", completed: false }] };
+                            const count = parseInt(ex.sets) || 1;
+                            const setsArr = Array.from({length: count}).map(() => ({ weight: 0, reps: ex.reps || "5m", completed: false }));
+                            return { ...ex, sets: setsArr };
                         }
                         
                         const scheme = getWeekScheme(currentWeek, ex.type);
@@ -424,6 +431,10 @@
                 setActiveWorkout(null);
                 setWorkoutStartTime(null);
                 setView('home');
+            };
+
+            const isWorkoutCompletedThisWeek = (progId) => {
+                return history.find(h => h.id === progId && h.week === currentWeek);
             };
 
             // ---- NUTRITION LOGIC ----
@@ -947,7 +958,7 @@
                                                                         <span className="text-[10px] text-slate-600 font-black uppercase tracking-tighter">LB</span>
                                                                     </div>
                                                                     <div className="flex items-baseline gap-1">
-                                                                        <input type="number" value={s.reps === 0 ? '' : s.reps} placeholder="0" onChange={(e) => handleRepChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-12 input-focus-effect bg-transparent text-right text-slate-300 outline-none" />
+                                                                        <input type="text" value={s.reps === 0 ? '' : s.reps} placeholder="0" onChange={(e) => handleRepChange(exIdx, si, e.target.value)} className="text-3xl font-black tracking-tighter leading-none w-14 input-focus-effect bg-transparent text-right text-slate-300 outline-none" />
                                                                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-tighter">Reps</span>
                                                                     </div>
                                                                 </React.Fragment>
@@ -1044,7 +1055,7 @@
                                                             ) : (
                                                                 <React.Fragment>
                                                                     <span className="block text-xs font-black text-blue-400">{s.weight}lb</span>
-                                                                    <span className="text-slate-500 text-[9px] uppercase font-bold">{s.reps} Reps</span>
+                                                                    <span className="text-slate-500 text-[9px] uppercase font-bold">{s.reps} {isNaN(Number(s.reps)) ? '' : 'Reps'}</span>
                                                                 </React.Fragment>
                                                             )}
                                                         </div>
